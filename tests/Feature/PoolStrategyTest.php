@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Carbon\CarbonInterface;
 use LucaLongo\LaravelEntitlements\Exceptions\NoEntitlementAvailableException;
 use LucaLongo\LaravelEntitlements\Models\License;
 use LucaLongo\LaravelEntitlements\Models\Plan;
@@ -15,7 +16,7 @@ beforeEach(function (): void {
     $this->plan = Plan::factory()->create();
 });
 
-function makePoolLicense(\Workbench\App\Models\Subscriber $subscriber, \LucaLongo\LaravelEntitlements\Models\Plan $plan, int $total, ?\Carbon\CarbonInterface $endsAt): License
+function makePoolLicense(Subscriber $subscriber, Plan $plan, int $total, ?CarbonInterface $endsAt): License
 {
     return License::create([
         'subscriber_type' => $subscriber->getMorphClass(),
@@ -32,7 +33,7 @@ function makePoolLicense(\Workbench\App\Models\Subscriber $subscriber, \LucaLong
 it('consumes amount from a single license', function (): void {
     $license = makePoolLicense($this->subscriber, $this->plan, 100, now()->addMonth());
     $subject = Subject::create();
-    $strategy = new PoolStrategy();
+    $strategy = new PoolStrategy;
 
     $usage = $strategy->consume($this->subscriber, TestType::Pooled, $subject, amount: 30);
 
@@ -45,7 +46,7 @@ it('drains across multiple licenses ordered by ends_at ascending then nulls last
     $late = makePoolLicense($this->subscriber, $this->plan, 50, now()->addMonth());
     $perpetual = makePoolLicense($this->subscriber, $this->plan, 100, null);
 
-    $strategy = new PoolStrategy();
+    $strategy = new PoolStrategy;
     $strategy->consume($this->subscriber, TestType::Pooled, Subject::create(), amount: 60);
 
     expect($early->fresh()->slot_used)->toBe(20);
@@ -55,7 +56,7 @@ it('drains across multiple licenses ordered by ends_at ascending then nulls last
 
 it('throws when pool capacity is insufficient', function (): void {
     makePoolLicense($this->subscriber, $this->plan, 10, now()->addMonth());
-    $strategy = new PoolStrategy();
+    $strategy = new PoolStrategy;
 
     expect(fn () => $strategy->consume($this->subscriber, TestType::Pooled, Subject::create(), amount: 50))
         ->toThrow(NoEntitlementAvailableException::class);
@@ -63,7 +64,7 @@ it('throws when pool capacity is insufficient', function (): void {
 
 it('forceRelease subtracts amount from license slot_used', function (): void {
     $license = makePoolLicense($this->subscriber, $this->plan, 100, now()->addMonth());
-    $strategy = new PoolStrategy();
+    $strategy = new PoolStrategy;
     $usage = $strategy->consume($this->subscriber, TestType::Pooled, Subject::create(), amount: 40);
 
     $strategy->forceRelease($usage);
@@ -72,5 +73,5 @@ it('forceRelease subtracts amount from license slot_used', function (): void {
 });
 
 it('supportsTwoPhaseRelease is false', function (): void {
-    expect((new PoolStrategy())->supportsTwoPhaseRelease())->toBeFalse();
+    expect((new PoolStrategy)->supportsTwoPhaseRelease())->toBeFalse();
 });

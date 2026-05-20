@@ -7,8 +7,16 @@ namespace LucaLongo\LaravelEntitlements\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LucaLongo\LaravelEntitlements\Contracts\EntitlementType;
 use LucaLongo\LaravelEntitlements\Exceptions\InvalidEntitlementTypeException;
 
+/**
+ * @property int $id
+ * @property int $plan_id
+ * @property EntitlementType $type
+ * @property int $quantity
+ * @property bool $is_flexible
+ */
 final class PlanItem extends Model
 {
     use HasFactory;
@@ -17,7 +25,7 @@ final class PlanItem extends Model
 
     public function getTable(): string
     {
-        return config('entitlements.table_names.plan_items');
+        return (string) config('entitlements.table_names.plan_items', 'entitlement_plan_items');
     }
 
     public function plan(): BelongsTo

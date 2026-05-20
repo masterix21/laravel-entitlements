@@ -12,6 +12,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use LucaLongo\LaravelEntitlements\Enums\LicenseUsageStatus;
 
+/**
+ * @property int $id
+ * @property int $license_id
+ * @property string $subject_type
+ * @property int $subject_id
+ * @property int $amount
+ * @property LicenseUsageStatus $status
+ *
+ * @method static Builder<static> open()
+ */
 final class LicenseUsage extends Model
 {
     use HasFactory;
@@ -20,12 +30,18 @@ final class LicenseUsage extends Model
 
     public function getTable(): string
     {
-        return config('entitlements.table_names.license_usages');
+        return (string) config('entitlements.table_names.license_usages', 'entitlement_license_usages');
     }
 
+    /**
+     * @return BelongsTo<License, $this>
+     */
     public function license(): BelongsTo
     {
-        return $this->belongsTo(config('entitlements.models.license', License::class));
+        /** @var class-string<License> $model */
+        $model = config('entitlements.models.license', License::class);
+
+        return $this->belongsTo($model);
     }
 
     public function subject(): MorphTo
@@ -34,7 +50,7 @@ final class LicenseUsage extends Model
     }
 
     #[Scope]
-    public function open(Builder $query): void
+    protected function open(Builder $query): void
     {
         $query->where('status', '!=', LicenseUsageStatus::Released);
     }

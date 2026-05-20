@@ -20,7 +20,7 @@ final class PlanCategory extends Model
 
     public function getTable(): string
     {
-        return config('entitlements.table_names.plan_categories');
+        return (string) config('entitlements.table_names.plan_categories', 'entitlement_plan_categories');
     }
 
     public function plans(): HasMany

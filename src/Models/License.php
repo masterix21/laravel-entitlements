@@ -12,9 +12,27 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementType;
 use LucaLongo\LaravelEntitlements\Exceptions\InvalidEntitlementTypeException;
 
+/**
+ * @property int $id
+ * @property string $subscriber_type
+ * @property int $subscriber_id
+ * @property int $plan_id
+ * @property int|null $parent_id
+ * @property EntitlementType $type
+ * @property int $slot_total
+ * @property int $slot_used
+ * @property Carbon|null $last_checked_at
+ * @property Carbon $starts_at
+ * @property Carbon|null $ends_at
+ * @property int $remaining
+ *
+ * @method static Builder<static> valid()
+ * @method static Builder<static> ofType(EntitlementType $type)
+ */
 final class License extends Model
 {
     use HasFactory;
@@ -23,7 +41,7 @@ final class License extends Model
 
     public function getTable(): string
     {
-        return config('entitlements.table_names.licenses');
+        return (string) config('entitlements.table_names.licenses', 'entitlement_licenses');
     }
 
     public function subscriber(): MorphTo
@@ -46,9 +64,15 @@ final class License extends Model
         return $this->hasMany(self::class, 'parent_id');
     }
 
+    /**
+     * @return HasMany<LicenseUsage, $this>
+     */
     public function usages(): HasMany
     {
-        return $this->hasMany(config('entitlements.models.license_usage', LicenseUsage::class));
+        /** @var class-string<LicenseUsage> $model */
+        $model = config('entitlements.models.license_usage', LicenseUsage::class);
+
+        return $this->hasMany($model);
     }
 
     public function remaining(): Attribute
@@ -68,7 +92,7 @@ final class License extends Model
     }
 
     #[Scope]
-    public function valid(Builder $query): void
+    protected function valid(Builder $query): void
     {
         $now = now();
 
@@ -79,7 +103,7 @@ final class License extends Model
     }
 
     #[Scope]
-    public function ofType(Builder $query, EntitlementType $type): void
+    protected function ofType(Builder $query, EntitlementType $type): void
     {
         $query->where('type', $type->value);
     }

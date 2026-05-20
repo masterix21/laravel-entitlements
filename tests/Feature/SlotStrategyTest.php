@@ -34,7 +34,7 @@ it('consume creates usage and increments slot_used', function (): void {
     Event::fake([LicenseConsumed::class]);
 
     $subject = Subject::create();
-    $strategy = new SlotStrategy();
+    $strategy = new SlotStrategy;
 
     $usage = $strategy->consume($this->subscriber, TestType::Single, $subject);
 
@@ -46,7 +46,7 @@ it('consume creates usage and increments slot_used', function (): void {
 
 it('consume throws when no slot available', function (): void {
     $this->license->update(['slot_used' => 2]);
-    $strategy = new SlotStrategy();
+    $strategy = new SlotStrategy;
     $subject = Subject::create();
 
     expect(fn () => $strategy->consume($this->subscriber, TestType::Single, $subject))
@@ -97,7 +97,7 @@ it('forceRelease releases from any state', function (): void {
 });
 
 it('forceRelease is idempotent when already released', function (): void {
-    $strategy = new SlotStrategy();
+    $strategy = new SlotStrategy;
     $usage = $strategy->consume($this->subscriber, TestType::Single, Subject::create());
     $strategy->forceRelease($usage);
     $beforeUsed = $this->license->fresh()->slot_used;

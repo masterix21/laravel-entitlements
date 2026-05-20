@@ -54,7 +54,8 @@ final class PoolStrategy implements EntitlementStrategy
                     continue;
                 }
 
-                $usage = $license->usages()->create([
+                $usage = LicenseUsage::query()->create([
+                    'license_id' => $license->getKey(),
                     'subject_type' => $subject->getMorphClass(),
                     'subject_id' => $subject->getKey(),
                     'amount' => $take,
@@ -67,6 +68,10 @@ final class PoolStrategy implements EntitlementStrategy
                 $primaryUsage ??= $usage;
 
                 LicenseConsumed::dispatch($usage);
+            }
+
+            if (! $primaryUsage instanceof LicenseUsage) {
+                throw NoEntitlementAvailableException::forSubscriber($subscriber, $type, $amount);
             }
 
             return $primaryUsage;

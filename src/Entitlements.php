@@ -8,6 +8,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use LucaLongo\LaravelEntitlements\Contracts\EntitlementStrategy;
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementType;
 use LucaLongo\LaravelEntitlements\Events\LicenseReconciled;
 use LucaLongo\LaravelEntitlements\Events\PlanAssigned;
@@ -29,14 +30,20 @@ final class Entitlements
             : $plan->billing_period->advance($startsAt);
 
         $licenses = DB::transaction(function () use ($subscriber, $plan, $startsAt, $endsAt, $quantityOverrides): Collection {
-            return $plan->items->map(fn (PlanItem $item): License => $this->createLicenseFromItem(
-                $subscriber,
-                $plan,
-                $item,
-                $startsAt,
-                $endsAt,
-                $quantityOverrides,
-            ));
+            $created = new Collection;
+
+            foreach ($plan->items as $item) {
+                $created->push($this->createLicenseFromItem(
+                    $subscriber,
+                    $plan,
+                    $item,
+                    $startsAt,
+                    $endsAt,
+                    $quantityOverrides,
+                ));
+            }
+
+            return $created;
         });
 
         PlanAssigned::dispatch($subscriber, $plan, $licenses);
@@ -119,7 +126,7 @@ final class Entitlements
         return ['reconciled' => $licenses->count()];
     }
 
-    private function strategyFor(LicenseUsage $usage): \LucaLongo\LaravelEntitlements\Contracts\EntitlementStrategy
+    private function strategyFor(LicenseUsage $usage): EntitlementStrategy
     {
         return $usage->license->type->strategy();
     }

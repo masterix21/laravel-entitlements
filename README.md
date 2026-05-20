@@ -1,24 +1,15 @@
-# :package_description
+# Simple and flexible entitlement management for Laravel applications, with support for plans, features, limits, and usage tracking.
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/:vendor_slug/:package_slug.svg?style=flat-square)](https://packagist.org/packages/:vendor_slug/:package_slug)
-[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/:vendor_slug/:package_slug/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/:vendor_slug/:package_slug/actions?query=workflow%3Arun-tests+branch%3Amain)
-[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/:vendor_slug/:package_slug/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/:vendor_slug/:package_slug/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
-[![Total Downloads](https://img.shields.io/packagist/dt/:vendor_slug/:package_slug.svg?style=flat-square)](https://packagist.org/packages/:vendor_slug/:package_slug)
-<!--delete-->
----
-This repo can be used to scaffold a Laravel package. Follow these steps to get started:
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/masterix21/laravel-entitlements.svg?style=flat-square)](https://packagist.org/packages/masterix21/laravel-entitlements)
+[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/masterix21/laravel-entitlements/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/masterix21/laravel-entitlements/actions?query=workflow%3Arun-tests+branch%3Amain)
+[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/masterix21/laravel-entitlements/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/masterix21/laravel-entitlements/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
+[![Total Downloads](https://img.shields.io/packagist/dt/masterix21/laravel-entitlements.svg?style=flat-square)](https://packagist.org/packages/masterix21/laravel-entitlements)
 
-1. Press the "Use this template" button at the top of this repo to create a new repo with the contents of this skeleton.
-2. Run "php ./configure.php" to run a script that will replace all placeholders throughout all the files.
-3. Have fun creating your package.
-4. If you need help creating a package, consider picking up our <a href="https://laravelpackage.training">Laravel Package Training</a> video course.
----
-<!--/delete-->
 This is where your description should go. Limit it to a paragraph or two. Consider adding a small example.
 
 ## Support us
 
-[<img src="https://github-ads.s3.eu-central-1.amazonaws.com/:package_name.jpg?t=1" width="419px" />](https://spatie.be/github-ad-click/:package_name)
+[<img src="https://github-ads.s3.eu-central-1.amazonaws.com/laravel-entitlements.jpg?t=1" width="419px" />](https://spatie.be/github-ad-click/laravel-entitlements)
 
 We invest a lot of resources into creating [best in class open source packages](https://spatie.be/open-source). You can support us by [buying one of our paid products](https://spatie.be/open-source/support-us).
 
@@ -29,20 +20,20 @@ We highly appreciate you sending us a postcard from your hometown, mentioning wh
 You can install the package via composer:
 
 ```bash
-composer require :vendor_slug/:package_slug
+composer require masterix21/laravel-entitlements
 ```
 
 You can publish and run the migrations with:
 
 ```bash
-php artisan vendor:publish --tag=":package_slug-migrations"
+php artisan vendor:publish --tag="laravel-entitlements-migrations"
 php artisan migrate
 ```
 
 You can publish the config file with:
 
 ```bash
-php artisan vendor:publish --tag=":package_slug-config"
+php artisan vendor:publish --tag="laravel-entitlements-config"
 ```
 
 This is the contents of the published config file:
@@ -55,14 +46,61 @@ return [
 Optionally, you can publish the views using
 
 ```bash
-php artisan vendor:publish --tag=":package_slug-views"
+php artisan vendor:publish --tag="laravel-entitlements-views"
 ```
 
 ## Usage
 
+Define a backed enum in your application that implements `EntitlementType`:
+
 ```php
-$:variable = new VendorName\Skeleton();
-echo $:variable->echoPhrase('Hello, VendorName!');
+use LucaLongo\LaravelEntitlements\Contracts\EntitlementStrategy;
+use LucaLongo\LaravelEntitlements\Contracts\EntitlementType;
+use LucaLongo\LaravelEntitlements\Strategies\PoolStrategy;
+use LucaLongo\LaravelEntitlements\Strategies\SlotStrategy;
+
+enum LicenseType: string implements EntitlementType
+{
+    case Device = 'device';
+    case AiTokens = 'ai_tokens';
+
+    public function strategy(): EntitlementStrategy
+    {
+        return match ($this) {
+            self::Device => new SlotStrategy(twoPhase: true),
+            self::AiTokens => new PoolStrategy(),
+        };
+    }
+}
+```
+
+Then set it in `config/entitlements.php`:
+
+```php
+'type_enum' => \App\Enums\LicenseType::class,
+```
+
+Add the trait to the model that owns licenses:
+
+```php
+use LucaLongo\LaravelEntitlements\Concerns\HasEntitlements;
+
+class Workspace extends Model
+{
+    use HasEntitlements;
+}
+```
+
+Use the facade:
+
+```php
+use LucaLongo\LaravelEntitlements\Facades\Entitlements;
+
+Entitlements::assignPlan($workspace, $plan, now());
+Entitlements::consume($workspace, LicenseType::Device, $device);
+Entitlements::requestRelease($usage);
+Entitlements::confirmRelease($usage);
+Entitlements::consume($workspace, LicenseType::AiTokens, $aiUsage, amount: 1500);
 ```
 
 ## Testing
@@ -85,7 +123,7 @@ Please review [our security policy](../../security/policy) on how to report secu
 
 ## Credits
 
-- [:author_name](https://github.com/:author_username)
+- [Luca Longo](https://github.com/masterix21)
 - [All Contributors](../../contributors)
 
 ## License

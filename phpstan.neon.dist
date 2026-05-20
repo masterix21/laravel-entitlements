@@ -7,4 +7,5 @@ parameters:
         - src
         - config
         - database
+        - workbench/app
     tmpDir: build/phpstan

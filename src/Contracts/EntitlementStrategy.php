@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace LucaLongo\LaravelEntitlements\Contracts;
 
 use Illuminate\Database\Eloquent\Model;
-use LucaLongo\LaravelEntitlements\Models\License;
 use LucaLongo\LaravelEntitlements\Models\LicenseUsage;
 
 interface EntitlementStrategy

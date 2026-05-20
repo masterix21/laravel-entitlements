@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\File;
 use LucaLongo\LaravelEntitlements\LaravelEntitlementsServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
+use Workbench\App\Enums\TestType;
 
 class TestCase extends Orchestra
 {
@@ -35,7 +36,7 @@ class TestCase extends Orchestra
             'database' => ':memory:',
             'prefix' => '',
         ]);
-        config()->set('entitlements.type_enum', \Workbench\App\Enums\TestType::class);
+        config()->set('entitlements.type_enum', TestType::class);
 
         foreach (File::allFiles(__DIR__.'/../workbench/database/migrations') as $migration) {
             (include $migration->getRealPath())->up();

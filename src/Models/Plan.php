@@ -13,6 +13,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use LucaLongo\LaravelEntitlements\Enums\BillingPeriod;
 use Spatie\Translatable\HasTranslations;
 
+/**
+ * @property int $id
+ * @property int|null $plan_category_id
+ * @property string $name
+ * @property BillingPeriod $billing_period
+ * @property bool $is_recurring
+ * @property bool $is_active
+ *
+ * @method static Builder<static> active()
+ */
 final class Plan extends Model
 {
     use HasFactory;
@@ -24,7 +34,7 @@ final class Plan extends Model
 
     public function getTable(): string
     {
-        return config('entitlements.table_names.plans');
+        return (string) config('entitlements.table_names.plans', 'entitlement_plans');
     }
 
     public function category(): BelongsTo
@@ -35,13 +45,19 @@ final class Plan extends Model
         );
     }
 
+    /**
+     * @return HasMany<PlanItem, $this>
+     */
     public function items(): HasMany
     {
-        return $this->hasMany(config('entitlements.models.plan_item', PlanItem::class));
+        /** @var class-string<PlanItem> $model */
+        $model = config('entitlements.models.plan_item', PlanItem::class);
+
+        return $this->hasMany($model);
     }
 
     #[Scope]
-    public function active(Builder $query): void
+    protected function active(Builder $query): void
     {
         $query->where('is_active', true);
     }

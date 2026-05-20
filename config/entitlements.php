@@ -1,16 +1,21 @@
 <?php
 
 declare(strict_types=1);
+use LucaLongo\LaravelEntitlements\Models\License;
+use LucaLongo\LaravelEntitlements\Models\LicenseUsage;
+use LucaLongo\LaravelEntitlements\Models\Plan;
+use LucaLongo\LaravelEntitlements\Models\PlanCategory;
+use LucaLongo\LaravelEntitlements\Models\PlanItem;
 
 return [
     'type_enum' => null,
 
     'models' => [
-        'plan_category' => \LucaLongo\LaravelEntitlements\Models\PlanCategory::class,
-        'plan' => \LucaLongo\LaravelEntitlements\Models\Plan::class,
-        'plan_item' => \LucaLongo\LaravelEntitlements\Models\PlanItem::class,
-        'license' => \LucaLongo\LaravelEntitlements\Models\License::class,
-        'license_usage' => \LucaLongo\LaravelEntitlements\Models\LicenseUsage::class,
+        'plan_category' => PlanCategory::class,
+        'plan' => Plan::class,
+        'plan_item' => PlanItem::class,
+        'license' => License::class,
+        'license_usage' => LicenseUsage::class,
     ],
 
     'table_names' => [

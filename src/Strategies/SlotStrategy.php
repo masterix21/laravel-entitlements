@@ -37,7 +37,8 @@ final class SlotStrategy implements EntitlementStrategy
                 throw NoEntitlementAvailableException::forSubscriber($subscriber, $type, 1);
             }
 
-            $usage = $license->usages()->create([
+            $usage = LicenseUsage::query()->create([
+                'license_id' => $license->getKey(),
                 'subject_type' => $subject->getMorphClass(),
                 'subject_id' => $subject->getKey(),
                 'amount' => 1,

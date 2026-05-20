@@ -18,7 +18,7 @@ enum TestType: string implements EntitlementType
     {
         return match ($this) {
             self::Single => new SlotStrategy(twoPhase: true),
-            self::Pooled => new PoolStrategy(),
+            self::Pooled => new PoolStrategy,
         };
     }
 }

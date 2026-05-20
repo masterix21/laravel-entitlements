@@ -7,8 +7,8 @@ use LucaLongo\LaravelEntitlements\Models\License;
 use LucaLongo\LaravelEntitlements\Models\LicenseUsage;
 use LucaLongo\LaravelEntitlements\Models\Plan;
 use Workbench\App\Enums\TestType;
-use Workbench\App\Models\Subscriber;
 use Workbench\App\Models\Subject;
+use Workbench\App\Models\Subscriber;
 
 it('filters valid licenses by date window', function (): void {
     $subscriber = Subscriber::create(['name' => 'acme']);
