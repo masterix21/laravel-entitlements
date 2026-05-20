@@ -48,7 +48,7 @@ final class PlansTable
                     ->label(__('Resources'))
                     ->listWithLineBreaks()
                     ->state(fn (Plan $record): array => $record->items
-                        ->map(fn (PlanItem $item): string => number_format($item->quantity).' '.(method_exists($item->type, 'getLabel') ? $item->type->getLabel() : $item->type->name))
+                        ->map(fn (PlanItem $item): string => number_format($item->quantity).' '.(method_exists($item->type, 'getLabel') ? $item->type->getLabel() : __($item->type->name)))
                         ->all())
                     ->placeholder(__('No resources')),
 

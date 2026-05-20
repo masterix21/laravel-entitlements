@@ -97,7 +97,7 @@ final class PlanForm
 
         return collect($enum::cases())
             ->mapWithKeys(fn ($case): array => [
-                $case->value => method_exists($case, 'getLabel') ? $case->getLabel() : $case->name,
+                $case->value => method_exists($case, 'getLabel') ? $case->getLabel() : __($case->name),
             ])
             ->all();
     }

@@ -268,6 +268,6 @@ final class LicensesRelationManager extends RelationManager
             return '';
         }
 
-        return method_exists($type, 'getLabel') ? $type->getLabel() : ($type->name ?? (string) $type);
+        return method_exists($type, 'getLabel') ? $type->getLabel() : (isset($type->name) ? __($type->name) : (string) $type);
     }
 }
