@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LucaLongo\LaravelEntitlements\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -91,8 +90,7 @@ final class License extends Model
         return $this->ends_at === null || $this->ends_at->isAfter($now);
     }
 
-    #[Scope]
-    protected function valid(Builder $query): void
+    protected function scopeValid(Builder $query): void
     {
         $now = now();
 
@@ -102,8 +100,7 @@ final class License extends Model
             });
     }
 
-    #[Scope]
-    protected function ofType(Builder $query, EntitlementType $type): void
+    protected function scopeOfType(Builder $query, EntitlementType $type): void
     {
         $query->where('type', $type->value);
     }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LucaLongo\LaravelEntitlements\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -56,8 +55,7 @@ final class Plan extends Model
         return $this->hasMany($model);
     }
 
-    #[Scope]
-    protected function active(Builder $query): void
+    protected function scopeActive(Builder $query): void
     {
         $query->where('is_active', true);
     }

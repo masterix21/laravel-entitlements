@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LucaLongo\LaravelEntitlements\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -49,8 +48,7 @@ final class LicenseUsage extends Model
         return $this->morphTo();
     }
 
-    #[Scope]
-    protected function open(Builder $query): void
+    protected function scopeOpen(Builder $query): void
     {
         $query->where('status', '!=', LicenseUsageStatus::Released);
     }
