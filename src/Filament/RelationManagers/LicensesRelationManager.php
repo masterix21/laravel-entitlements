@@ -171,15 +171,51 @@ final class LicensesRelationManager extends RelationManager
             ->recordActions([
                 EditAction::make()
                     ->iconButton()
-                    ->form([
-                        DatePicker::make('starts_at')
-                            ->label(__('Start Date'))
-                            ->required(),
+                    ->fillForm(function (License $record): array {
+                        $licenses = self::groupLicenses($record);
 
-                        DatePicker::make('ends_at')
-                            ->label(__('Expiration'))
-                            ->helperText(__('Empty means the license never expires.')),
-                    ]),
+                        return [
+                            'starts_at' => $record->starts_at,
+                            'ends_at' => $record->ends_at,
+                            'slot_totals' => $licenses
+                                ->mapWithKeys(fn (License $l): array => [$l->id => $l->slot_total])
+                                ->all(),
+                        ];
+                    })
+                    ->form(fn (License $record): array => array_merge(
+                        [
+                            DatePicker::make('starts_at')
+                                ->label(__('Start Date'))
+                                ->required(),
+
+                            DatePicker::make('ends_at')
+                                ->label(__('Expiration'))
+                                ->helperText(__('Empty means the license never expires.')),
+                        ],
+                        self::groupLicenses($record)
+                            ->map(fn (License $l): TextInput => TextInput::make("slot_totals.{$l->id}")
+                                ->label(trans(':type quantity', ['type' => self::typeLabel($l->type)]))
+                                ->numeric()
+                                ->minValue(0)
+                                ->required())
+                            ->all(),
+                    ))
+                    ->using(function (License $record, array $data): License {
+                        \Illuminate\Support\Facades\DB::transaction(function () use ($record, $data): void {
+                            $startsAt = empty($data['starts_at']) ? null : \Carbon\CarbonImmutable::parse($data['starts_at']);
+                            $endsAt = empty($data['ends_at']) ? null : \Carbon\CarbonImmutable::parse($data['ends_at']);
+
+                            foreach (self::groupLicenses($record) as $license) {
+                                $license->update([
+                                    'starts_at' => $startsAt,
+                                    'ends_at' => $endsAt,
+                                    'slot_total' => (int) ($data['slot_totals'][$license->id] ?? $license->slot_total),
+                                ]);
+                            }
+                        });
+
+                        return $record->fresh();
+                    }),
 
                 Action::make('forceRelease')
                     ->label(__('Force Release Slot'))
