@@ -44,7 +44,7 @@ final class LicensesRelationManager extends RelationManager
     {
         return $table
             ->description(fn (): string => __(':n active license(s)', [
-                'n' => number_format($this->getOwnerRecord()->licenses()->valid()->count()),
+                'n' => number_format($this->getOwnerRecord()->licenses()->valid()->whereNull('parent_id')->count()),
             ]))
             ->modifyQueryUsing(fn (Builder $query): Builder => $query
                 ->whereNull('parent_id')
