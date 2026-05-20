@@ -40,6 +40,11 @@ final class PlanResource extends Resource
         return __('Plans');
     }
 
+    public static function getNavigationLabel(): string
+    {
+        return __('Subscription Plans');
+    }
+
     public static function form(Schema $schema): Schema
     {
         return PlanForm::configure($schema);

@@ -28,7 +28,7 @@ final class PlanCategoryResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 22;
 
     public static function getModelLabel(): string
     {
@@ -38,6 +38,11 @@ final class PlanCategoryResource extends Resource
     public static function getPluralModelLabel(): string
     {
         return __('Plan Categories');
+    }
+
+    public static function getNavigationParentItem(): ?string
+    {
+        return __('Subscription Plans');
     }
 
     public static function form(Schema $schema): Schema
