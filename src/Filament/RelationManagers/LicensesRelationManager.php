@@ -21,6 +21,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use LucaLongo\LaravelEntitlements\Enums\BillingPeriod;
 use LucaLongo\LaravelEntitlements\Enums\LicenseUsageStatus;
@@ -33,7 +34,7 @@ final class LicensesRelationManager extends RelationManager
 {
     protected static string $relationship = 'licenses';
 
-    public static function getTitle(\Illuminate\Database\Eloquent\Model $ownerRecord, string $pageClass): string
+    public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
         return __('Licenses');
     }
