@@ -10,7 +10,7 @@ it('advances a date by one month for Monthly', function (): void {
 
     $advanced = BillingPeriod::Monthly->advance($start);
 
-    expect($advanced->diffInMonths($start))->toBe(1);
+    expect($advanced->equalTo($start->copy()->addMonthNoOverflow()))->toBeTrue();
 });
 
 it('advances a date by one year for Yearly', function (): void {
@@ -18,7 +18,7 @@ it('advances a date by one year for Yearly', function (): void {
 
     $advanced = BillingPeriod::Yearly->advance($start);
 
-    expect($advanced->diffInYears($start))->toBe(1);
+    expect($advanced->equalTo($start->copy()->addYear()))->toBeTrue();
 });
 
 it('lists license usage statuses', function (): void {
