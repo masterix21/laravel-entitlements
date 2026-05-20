@@ -172,35 +172,39 @@ final class LicensesRelationManager extends RelationManager
             ->recordActions([
                 EditAction::make()
                     ->iconButton()
+                    ->modalHeading(__('Edit Plan'))
                     ->fillForm(function (License $record): array {
-                        $licenses = self::groupLicenses($record);
-
                         return [
                             'starts_at' => $record->starts_at,
                             'ends_at' => $record->ends_at,
-                            'slot_totals' => $licenses
+                            'slot_totals' => self::groupLicenses($record)
                                 ->mapWithKeys(fn (License $l): array => [$l->id => $l->slot_total])
                                 ->all(),
                         ];
                     })
-                    ->form(fn (License $record): array => array_merge(
-                        [
-                            DatePicker::make('starts_at')
-                                ->label(__('Start Date'))
-                                ->required(),
+                    ->form(fn (License $record): array => [
+                        Grid::make(2)
+                            ->schema([
+                                DatePicker::make('starts_at')
+                                    ->label(__('Starts At'))
+                                    ->required(),
 
-                            DatePicker::make('ends_at')
-                                ->label(__('Expiration'))
-                                ->helperText(__('Empty means the license never expires.')),
-                        ],
-                        self::groupLicenses($record)
-                            ->map(fn (License $l): TextInput => TextInput::make("slot_totals.{$l->id}")
-                                ->label(trans(':type quantity', ['type' => self::typeLabel($l->type)]))
-                                ->numeric()
-                                ->minValue(0)
-                                ->required())
-                            ->all(),
-                    ))
+                                DatePicker::make('ends_at')
+                                    ->label(__('Expiration'))
+                                    ->helperText(__('Empty means the license never expires.')),
+
+                                Group::make()
+                                    ->columnSpanFull()
+                                    ->columns(2)
+                                    ->schema(self::groupLicenses($record)
+                                        ->map(fn (License $l): TextInput => TextInput::make("slot_totals.{$l->id}")
+                                            ->label(trans(':type quantity', ['type' => self::typeLabel($l->type)]))
+                                            ->numeric()
+                                            ->minValue(0)
+                                            ->required())
+                                        ->all()),
+                            ]),
+                    ])
                     ->using(function (License $record, array $data): License {
                         DB::transaction(function () use ($record, $data): void {
                             $startsAt = empty($data['starts_at']) ? null : CarbonImmutable::parse($data['starts_at']);
@@ -217,7 +221,6 @@ final class LicensesRelationManager extends RelationManager
 
                         return $record->fresh();
                     }),
-
                 Action::make('forceRelease')
                     ->label(__('Force Release Slot'))
                     ->icon('heroicon-o-lock-open')
