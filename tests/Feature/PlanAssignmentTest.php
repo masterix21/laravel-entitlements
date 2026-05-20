@@ -75,3 +75,22 @@ it('applies quantity overrides only to flexible items', function (): void {
     expect($byType[TestType::Single->value]->slot_total)->toBe(5);
     expect($byType[TestType::Pooled->value]->slot_total)->toBe(250);
 });
+
+it('assigns the first license as anchor and subsequent licenses as children', function (): void {
+    $subscriber = \Workbench\App\Models\Subscriber::create(['name' => 'acme']);
+
+    $plan = \LucaLongo\LaravelEntitlements\Models\Plan::factory()->create();
+    \LucaLongo\LaravelEntitlements\Models\PlanItem::factory()->for($plan)->create(['type' => \Workbench\App\Enums\TestType::Single->value, 'quantity' => 3]);
+    \LucaLongo\LaravelEntitlements\Models\PlanItem::factory()->for($plan)->create(['type' => \Workbench\App\Enums\TestType::Pooled->value, 'quantity' => 500]);
+    \LucaLongo\LaravelEntitlements\Models\PlanItem::factory()->for($plan)->create(['type' => \Workbench\App\Enums\TestType::Single->value, 'quantity' => 7]);
+
+    $licenses = \LucaLongo\LaravelEntitlements\Facades\Entitlements::assignPlan($subscriber, $plan, now());
+
+    expect($licenses)->toHaveCount(3);
+
+    $anchor = $licenses->first();
+    expect($anchor->parent_id)->toBeNull();
+
+    $children = $licenses->skip(1);
+    expect($children->every(fn ($l) => $l->parent_id === $anchor->id))->toBeTrue();
+});
