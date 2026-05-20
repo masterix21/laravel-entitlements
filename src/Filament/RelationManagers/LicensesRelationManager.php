@@ -24,6 +24,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use LucaLongo\LaravelEntitlements\Enums\BillingPeriod;
 use LucaLongo\LaravelEntitlements\Enums\LicenseUsageStatus;
 use LucaLongo\LaravelEntitlements\Facades\Entitlements;
@@ -201,9 +202,9 @@ final class LicensesRelationManager extends RelationManager
                             ->all(),
                     ))
                     ->using(function (License $record, array $data): License {
-                        \Illuminate\Support\Facades\DB::transaction(function () use ($record, $data): void {
-                            $startsAt = empty($data['starts_at']) ? null : \Carbon\CarbonImmutable::parse($data['starts_at']);
-                            $endsAt = empty($data['ends_at']) ? null : \Carbon\CarbonImmutable::parse($data['ends_at']);
+                        DB::transaction(function () use ($record, $data): void {
+                            $startsAt = empty($data['starts_at']) ? null : CarbonImmutable::parse($data['starts_at']);
+                            $endsAt = empty($data['ends_at']) ? null : CarbonImmutable::parse($data['ends_at']);
 
                             foreach (self::groupLicenses($record) as $license) {
                                 $license->update([
