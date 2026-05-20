@@ -17,6 +17,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
+use Filament\Forms\Components\Placeholder;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Tables\Columns\TextColumn;
@@ -185,6 +186,11 @@ final class LicensesRelationManager extends RelationManager
                     ->form(fn (License $record): array => [
                         Grid::make(2)
                             ->schema([
+                                Placeholder::make('plan')
+                                    ->label(__('Plan'))
+                                    ->content(self::planOptionLabel($record->plan))
+                                    ->columnSpanFull(),
+
                                 DatePicker::make('starts_at')
                                     ->label(__('Starts At'))
                                     ->required(),
