@@ -25,7 +25,7 @@ Every SaaS reinvents the same wheel: plans, plan items, licenses with start/end 
 
 ## Requirements
 
-- PHP `^8.4`
+- PHP `^8.2`
 - Laravel `^11 || ^12 || ^13`
 - `spatie/laravel-package-tools`
 - `spatie/laravel-translatable` (for translatable plan names)
