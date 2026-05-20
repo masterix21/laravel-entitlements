@@ -77,14 +77,14 @@ it('applies quantity overrides only to flexible items', function (): void {
 });
 
 it('assigns the first license as anchor and subsequent licenses as children', function (): void {
-    $subscriber = \Workbench\App\Models\Subscriber::create(['name' => 'acme']);
+    $subscriber = Subscriber::create(['name' => 'acme']);
 
-    $plan = \LucaLongo\LaravelEntitlements\Models\Plan::factory()->create();
-    \LucaLongo\LaravelEntitlements\Models\PlanItem::factory()->for($plan)->create(['type' => \Workbench\App\Enums\TestType::Single->value, 'quantity' => 3]);
-    \LucaLongo\LaravelEntitlements\Models\PlanItem::factory()->for($plan)->create(['type' => \Workbench\App\Enums\TestType::Pooled->value, 'quantity' => 500]);
-    \LucaLongo\LaravelEntitlements\Models\PlanItem::factory()->for($plan)->create(['type' => \Workbench\App\Enums\TestType::Single->value, 'quantity' => 7]);
+    $plan = Plan::factory()->create();
+    PlanItem::factory()->for($plan)->create(['type' => TestType::Single->value, 'quantity' => 3]);
+    PlanItem::factory()->for($plan)->create(['type' => TestType::Pooled->value, 'quantity' => 500]);
+    PlanItem::factory()->for($plan)->create(['type' => TestType::Single->value, 'quantity' => 7]);
 
-    $licenses = \LucaLongo\LaravelEntitlements\Facades\Entitlements::assignPlan($subscriber, $plan, now());
+    $licenses = Entitlements::assignPlan($subscriber, $plan, now());
 
     expect($licenses)->toHaveCount(3);
 
