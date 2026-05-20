@@ -25,11 +25,13 @@ it('reconcile recomputes slot_used from open usages', function (): void {
         'plan_id' => $this->plan->id,
         'type' => TestType::Pooled->value,
         'slot_total' => 100,
-        'slot_used' => 99,
+        'slot_used' => 0,
         'starts_at' => now()->subDay(),
     ]);
 
     Entitlements::consume($this->subscriber, TestType::Pooled, Subject::create(), amount: 10);
+
+    $license->update(['slot_used' => 99]);
 
     Entitlements::reconcile($license);
 
