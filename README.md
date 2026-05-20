@@ -169,6 +169,8 @@ $licenses = Entitlements::assignPlan(
 
 Recurring plans produce licenses with `ends_at = null`. Fixed-term plans compute `ends_at` via `BillingPeriod::advance($startsAt)`.
 
+`assignPlan()` also threads a `parent_id`: the first license created becomes the anchor (`parent_id = null`), every subsequent license for the same call is linked to it. This is what lets the Filament UI render each plan assignment as a single row that aggregates all its resources.
+
 ### 5. Consume entitlements
 
 ```php
@@ -338,13 +340,23 @@ public static function getRelations(): array
 }
 ```
 
-The relation manager provides three actions out of the box:
+The relation manager provides these actions out of the box:
 
-- **Assign Plan** — pick an active plan, set start/end dates, override quantities for flexible items
-- **Recalculate Usages** — reconcile every license owned by the subscriber
-- **Force Release Slot** — admin override for usages stuck in `Releasing` (two-phase strategies)
+- **Assign Plan** — pick an active plan, set start/end dates, edit the quantity of every flexible item (defaults are pre-filled from the plan when you select it). Licenses created in the same assignment are grouped via `parent_id` so the table shows one row per assignment.
+- **Edit Plan** — same layout as Assign Plan with the plan shown read-only at the top. Lets you adjust `starts_at`, `ends_at` (propagated to anchor + children) and the quantity of every license in the group.
+- **Recalculate Usages** — reconcile every license owned by the subscriber.
+- **Force Release Slot** — admin override for usages stuck in `Releasing` (two-phase strategies).
 
-If the `type_enum` cases implement Filament's `HasLabel`, those labels are displayed in selects and badges; otherwise the enum case `name` is used as a fallback.
+By default Plan Categories appears nested under "Subscription Plans" in the navigation sidebar (`getNavigationParentItem()` on `PlanCategoryResource` matches `getNavigationLabel()` on `PlanResource`).
+
+### Translating entitlement type labels
+
+The Filament UI labels enum cases in two ways:
+
+1. If your `type_enum` cases implement a `getLabel(): string` method (the standard Filament `HasLabel` contract), it is used as-is.
+2. Otherwise the case `name` is passed through Laravel's `__()` helper, so you can translate it by adding the case name as a key in your `lang/{locale}.json` (e.g. `"Device": "Dispositivo"`).
+
+The placeholder `:type quantity` (used as the "Quantità X" label in the assign/edit form) is also translatable.
 
 ## Translations
 
