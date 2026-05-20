@@ -69,8 +69,7 @@ final class PlanForm
                         TextInput::make('quantity')
                             ->numeric()
                             ->minValue(1)
-                            ->required()
-                            ->helperText(__('A flexible quantity is set when the plan is assigned.')),
+                            ->required(),
 
                         Toggle::make('is_flexible')
                             ->label(__('Flexible')),
