@@ -96,6 +96,7 @@ final class LicensesRelationManager extends RelationManager
                                     ->afterStateUpdated(function ($state, Set $set): void {
                                         if (empty($state)) {
                                             $set('flexible_quantities', []);
+
                                             return;
                                         }
                                         $plan = Plan::query()->with('items')->find($state);
