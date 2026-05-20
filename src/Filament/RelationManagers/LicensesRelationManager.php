@@ -18,6 +18,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -92,6 +93,21 @@ final class LicensesRelationManager extends RelationManager
                                         ->all())
                                     ->required()
                                     ->live()
+                                    ->afterStateUpdated(function ($state, Set $set): void {
+                                        if (empty($state)) {
+                                            $set('flexible_quantities', []);
+                                            return;
+                                        }
+                                        $plan = Plan::query()->with('items')->find($state);
+                                        if ($plan === null) {
+                                            return;
+                                        }
+                                        $defaults = $plan->items
+                                            ->where('is_flexible', true)
+                                            ->mapWithKeys(fn (PlanItem $item): array => [$item->id => $item->quantity])
+                                            ->all();
+                                        $set('flexible_quantities', $defaults);
+                                    })
                                     ->native(false)
                                     ->columnSpanFull(),
 
