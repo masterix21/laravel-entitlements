@@ -9,3 +9,5 @@ parameters:
         - database
         - workbench/app
     tmpDir: build/phpstan
+    excludePaths:
+        - src/Filament
