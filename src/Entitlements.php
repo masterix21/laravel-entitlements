@@ -31,16 +31,21 @@ final class Entitlements
 
         $licenses = DB::transaction(function () use ($subscriber, $plan, $startsAt, $endsAt, $quantityOverrides): Collection {
             $created = new Collection;
+            $anchorId = null;
 
             foreach ($plan->items as $item) {
-                $created->push($this->createLicenseFromItem(
+                $license = $this->createLicenseFromItem(
                     $subscriber,
                     $plan,
                     $item,
                     $startsAt,
                     $endsAt,
+                    $anchorId,
                     $quantityOverrides,
-                ));
+                );
+
+                $anchorId ??= $license->id;
+                $created->push($license);
             }
 
             return $created;
@@ -140,6 +145,7 @@ final class Entitlements
         PlanItem $item,
         CarbonInterface $startsAt,
         ?CarbonInterface $endsAt,
+        ?int $parentId,
         array $quantityOverrides,
     ): License {
         $slotTotal = ($item->is_flexible && isset($quantityOverrides[$item->id]))
@@ -150,6 +156,7 @@ final class Entitlements
             'subscriber_type' => $subscriber->getMorphClass(),
             'subscriber_id' => $subscriber->getKey(),
             'plan_id' => $plan->id,
+            'parent_id' => $parentId,
             'type' => $item->type->value,
             'slot_total' => $slotTotal,
             'slot_used' => 0,
