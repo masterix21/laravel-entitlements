@@ -1,8 +1,9 @@
 # Laravel Entitlements
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/masterix21/laravel-entitlements.svg?style=flat-square)](https://packagist.org/packages/masterix21/laravel-entitlements)
+[![Tests](https://img.shields.io/github/actions/workflow/status/masterix21/laravel-entitlements/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/masterix21/laravel-entitlements/actions/workflows/run-tests.yml)
 [![Total Downloads](https://img.shields.io/packagist/dt/masterix21/laravel-entitlements.svg?style=flat-square)](https://packagist.org/packages/masterix21/laravel-entitlements)
-[![License](https://img.shields.io/packagist/l/masterix21/laravel-entitlements.svg?style=flat-square)](https://packagist.org/packages/masterix21/laravel-entitlements)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE.md)
 
 A flexible entitlement management system for Laravel applications. Define subscription plans, issue licenses to any model, and track consumption — slot-based or pool-based — with project-specific entitlement types injected via configuration.
 
