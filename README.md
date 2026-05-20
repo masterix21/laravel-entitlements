@@ -360,7 +360,7 @@ The placeholder `:type quantity` (used as the "Quantità X" label in the assign/
 
 ## Translations
 
-The package ships JSON translation files for English (`en`) and Italian (`it`) covering every string used by the Filament UI. They are loaded automatically — no extra setup needed.
+The package ships JSON translation files for English (`en`), Italian (`it`), Chinese (`zh`) and Russian (`ru`) covering every string used by the Filament UI. They are loaded automatically — no extra setup needed.
 
 To customize the translations, publish them to your app's `lang/` directory:
 
