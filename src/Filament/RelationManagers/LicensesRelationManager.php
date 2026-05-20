@@ -33,7 +33,10 @@ final class LicensesRelationManager extends RelationManager
 {
     protected static string $relationship = 'licenses';
 
-    protected static ?string $title = 'Licenses';
+    public static function getTitle(\Illuminate\Database\Eloquent\Model $ownerRecord, string $pageClass): string
+    {
+        return __('Licenses');
+    }
 
     public function table(Table $table): Table
     {
