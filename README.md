@@ -305,7 +305,7 @@ The package ships a Filament v5 plugin that exposes a Plans/Plan Categories admi
 Install Filament v5 plus the two optional UI dependencies the resources rely on:
 
 ```bash
-composer require filament/filament:^5.0 awcodes/badgeable-column codewithdennis/filament-lucide-icons
+composer require filament/filament:^5.0 awcodes/filament-badgeable-column codewithdennis/filament-lucide-icons
 ```
 
 Register the plugin on your panel:
