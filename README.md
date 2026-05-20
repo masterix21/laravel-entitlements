@@ -346,6 +346,18 @@ The relation manager provides three actions out of the box:
 
 If the `type_enum` cases implement Filament's `HasLabel`, those labels are displayed in selects and badges; otherwise the enum case `name` is used as a fallback.
 
+## Translations
+
+The package ships JSON translation files for English (`en`) and Italian (`it`) covering every string used by the Filament UI. They are loaded automatically — no extra setup needed.
+
+To customize the translations, publish them to your app's `lang/` directory:
+
+```bash
+php artisan vendor:publish --tag="laravel-entitlements-translations"
+```
+
+You can then edit `lang/it.json` and `lang/en.json` and add other locales (e.g. `lang/fr.json`) using the English strings as keys.
+
 ## Testing
 
 ```bash

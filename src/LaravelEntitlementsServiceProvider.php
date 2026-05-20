@@ -33,6 +33,10 @@ final class LaravelEntitlementsServiceProvider extends PackageServiceProvider
     public function packageBooted(): void
     {
         $this->validateTypeEnum();
+        $this->loadJsonTranslationsFrom(__DIR__.'/../lang');
+        $this->publishes([
+            __DIR__.'/../lang' => $this->app->langPath(),
+        ], 'laravel-entitlements-translations');
     }
 
     private function validateTypeEnum(): void
