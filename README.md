@@ -377,7 +377,7 @@ You can then edit `lang/it.json` and `lang/en.json` and add other locales (e.g. 
 composer test
 ```
 
-The test suite runs against `:memory:` SQLite via Orchestra Testbench, with a workbench `TestType` enum that maps `Single → SlotStrategy(twoPhase: true)` and `Pooled → PoolStrategy`.
+The test suite runs against `:memory:` SQLite via Orchestra Testbench, with a workbench `TestType` enum that maps `Single → SlotStrategy(twoPhase: true)` and `Pooled → PoolStrategy`. A workbench Filament admin panel exercises the `EntitlementsPlugin`, the two Resources and the translation files (`en`/`it`/`zh`/`ru` parity).
 
 ## Static analysis
 
