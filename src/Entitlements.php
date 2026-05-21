@@ -10,12 +10,20 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementStrategy;
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementType;
+use LucaLongo\LaravelEntitlements\Enums\PlanTransitionMode;
+use LucaLongo\LaravelEntitlements\Enums\PlanTransitionStatus;
 use LucaLongo\LaravelEntitlements\Events\LicenseReconciled;
 use LucaLongo\LaravelEntitlements\Events\PlanAssigned;
+use LucaLongo\LaravelEntitlements\Exceptions\AnchorNotActiveForTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\EndOfPeriodTransitionRequiresEndsAt;
+use LucaLongo\LaravelEntitlements\Exceptions\IncompatiblePlanTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\InsufficientCapacityForTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\PlanCategoryExclusivityViolation;
 use LucaLongo\LaravelEntitlements\Models\License;
 use LucaLongo\LaravelEntitlements\Models\LicenseUsage;
 use LucaLongo\LaravelEntitlements\Models\Plan;
 use LucaLongo\LaravelEntitlements\Models\PlanItem;
+use LucaLongo\LaravelEntitlements\Models\PlanTransition;
 
 final class Entitlements
 {
@@ -129,6 +137,119 @@ final class Entitlements
         }
 
         return ['reconciled' => $licenses->count()];
+    }
+
+    /**
+     * @param  array<int, int>  $quantityOverrides
+     */
+    public function changePlan(
+        License $anchor,
+        Plan $newPlan,
+        PlanTransitionMode $mode,
+        array $quantityOverrides = [],
+    ): PlanTransition {
+        $this->validateTransition($anchor, $newPlan, $quantityOverrides, $mode);
+
+        $scheduledAt = $mode === PlanTransitionMode::Immediate
+            ? now()
+            : $anchor->ends_at;
+
+        return PlanTransition::create([
+            'anchor_license_id' => $anchor->id,
+            'target_plan_id' => $newPlan->id,
+            'apply_mode' => $mode->value,
+            'status' => PlanTransitionStatus::Pending->value,
+            'scheduled_at' => $scheduledAt,
+            'quantity_overrides' => $quantityOverrides ?: null,
+        ]);
+    }
+
+    /**
+     * @param  array<int, int>  $quantityOverrides
+     */
+    private function validateTransition(
+        License $anchor,
+        Plan $newPlan,
+        array $quantityOverrides,
+        PlanTransitionMode $mode,
+    ): void {
+        if ($anchor->parent_id !== null) {
+            throw AnchorNotActiveForTransition::notAnchor($anchor->id);
+        }
+
+        if ($anchor->ends_at !== null && $anchor->ends_at->lessThanOrEqualTo(now())) {
+            throw AnchorNotActiveForTransition::expired($anchor->id);
+        }
+
+        if ($mode === PlanTransitionMode::EndOfPeriod && $anchor->ends_at === null) {
+            throw EndOfPeriodTransitionRequiresEndsAt::make();
+        }
+
+        $newPlan->loadMissing(['items', 'category']);
+
+        $newItemsByType = $newPlan->items->keyBy(fn (PlanItem $i) => $i->type->value);
+
+        $groupLicenses = License::query()
+            ->where('id', $anchor->id)
+            ->orWhere('parent_id', $anchor->id)
+            ->get();
+
+        $groupLicenseIds = $groupLicenses->pluck('id');
+
+        $openUsageLicenseIds = LicenseUsage::query()
+            ->whereIn('license_id', $groupLicenseIds)
+            ->open()
+            ->pluck('license_id')
+            ->unique();
+
+        $openUsageTypes = $groupLicenses
+            ->whereIn('id', $openUsageLicenseIds->all())
+            ->map(fn (License $l) => $l->type->value)
+            ->unique();
+
+        foreach ($openUsageTypes as $type) {
+            if (! $newItemsByType->has($type)) {
+                throw IncompatiblePlanTransition::forType((string) $type);
+            }
+        }
+
+        $usedByType = $groupLicenses
+            ->groupBy(fn (License $l) => $l->type->value)
+            ->map(fn ($licenses) => $licenses->sum('slot_used'));
+
+        foreach ($usedByType as $type => $used) {
+            if (! $newItemsByType->has($type)) {
+                continue;
+            }
+
+            /** @var PlanItem $item */
+            $item = $newItemsByType->get($type);
+            $capacity = ($item->is_flexible && isset($quantityOverrides[$item->id]))
+                ? (int) $quantityOverrides[$item->id]
+                : $item->quantity;
+
+            if ((int) $used > $capacity) {
+                throw InsufficientCapacityForTransition::forType((string) $type, (int) $used, $capacity);
+            }
+        }
+
+        $category = $newPlan->category;
+        if ($category !== null && ! $category->allows_multiple_active_plans) {
+            $conflict = License::query()
+                ->where('subscriber_type', $anchor->subscriber_type)
+                ->where('subscriber_id', $anchor->subscriber_id)
+                ->whereNull('parent_id')
+                ->where('id', '!=', $anchor->id)
+                ->whereHas('plan', fn ($q) => $q->where('plan_category_id', $category->id))
+                ->where(function ($q): void {
+                    $q->whereNull('ends_at')->orWhere('ends_at', '>', now());
+                })
+                ->exists();
+
+            if ($conflict) {
+                throw PlanCategoryExclusivityViolation::forCategory($category->id);
+            }
+        }
     }
 
     private function strategyFor(LicenseUsage $usage): EntitlementStrategy

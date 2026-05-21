@@ -91,3 +91,114 @@ it('scopes pending and due transitions', function (): void {
     expect(PlanTransition::pending()->count())->toBe(2);
     expect(PlanTransition::due()->pluck('id')->all())->toBe([$pendingDue->id]);
 });
+
+use LucaLongo\LaravelEntitlements\Enums\BillingPeriod;
+use LucaLongo\LaravelEntitlements\Exceptions\AnchorNotActiveForTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\EndOfPeriodTransitionRequiresEndsAt;
+use LucaLongo\LaravelEntitlements\Exceptions\IncompatiblePlanTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\InsufficientCapacityForTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\PlanCategoryExclusivityViolation;
+use LucaLongo\LaravelEntitlements\Facades\Entitlements;
+use LucaLongo\LaravelEntitlements\Models\PlanItem;
+
+function makePlan(array $items = [], ?int $categoryId = null): Plan
+{
+    $plan = Plan::factory()->create([
+        'billing_period' => BillingPeriod::Monthly->value,
+        'is_recurring' => false,
+        'plan_category_id' => $categoryId,
+    ]);
+    foreach ($items as $row) {
+        PlanItem::factory()->for($plan)->create($row);
+    }
+
+    return $plan;
+}
+
+it('rejects transition when anchor is not actually an anchor', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $licenses = Entitlements::assignPlan($subscriber, $plan, now());
+    $child = $licenses->firstWhere('parent_id', '!=', null) ?? $licenses->skip(1)->first();
+
+    if ($child === null) {
+        $child = License::create([
+            'subscriber_type' => $subscriber->getMorphClass(),
+            'subscriber_id' => $subscriber->getKey(),
+            'plan_id' => $plan->id,
+            'parent_id' => $licenses->first()->id,
+            'type' => TestType::Single->value,
+            'slot_total' => 1,
+            'starts_at' => now(),
+            'ends_at' => now()->addMonth(),
+        ]);
+    }
+
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+
+    Entitlements::changePlan($child, $target, PlanTransitionMode::Immediate);
+})->throws(AnchorNotActiveForTransition::class);
+
+it('rejects transition when anchor has already expired', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now()->subMonths(2))->first();
+    $anchor->update(['ends_at' => now()->subDay()]);
+
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+
+    Entitlements::changePlan($anchor->fresh(), $target, PlanTransitionMode::Immediate);
+})->throws(AnchorNotActiveForTransition::class);
+
+it('rejects end-of-period when anchor has no ends_at', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = Plan::factory()->create([
+        'billing_period' => BillingPeriod::Monthly->value,
+        'is_recurring' => true,
+    ]);
+    PlanItem::factory()->for($plan)->create(['type' => TestType::Single->value, 'quantity' => 1]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+
+    Entitlements::changePlan($anchor, $target, PlanTransitionMode::EndOfPeriod);
+})->throws(EndOfPeriodTransitionRequiresEndsAt::class);
+
+it('rejects transition when an open usage type is missing in the new plan', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([
+        ['type' => TestType::Single->value, 'quantity' => 1],
+        ['type' => TestType::Pooled->value, 'quantity' => 10],
+    ]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    Entitlements::consume($subscriber, TestType::Pooled, $subscriber, 1);
+
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+
+    Entitlements::changePlan($anchor, $target, PlanTransitionMode::Immediate);
+})->throws(IncompatiblePlanTransition::class);
+
+it('rejects transition when target capacity is below current usage', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Pooled->value, 'quantity' => 10]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    Entitlements::consume($subscriber, TestType::Pooled, $subscriber, 5);
+
+    $target = makePlan([['type' => TestType::Pooled->value, 'quantity' => 2]]);
+
+    Entitlements::changePlan($anchor, $target, PlanTransitionMode::Immediate);
+})->throws(InsufficientCapacityForTransition::class);
+
+it('rejects transition that would violate category exclusivity', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $category = PlanCategory::create(['name' => 'Exclusive', 'allows_multiple_active_plans' => false]);
+
+    $planA = makePlan([['type' => TestType::Single->value, 'quantity' => 1]], $category->id);
+    $planB = makePlan([['type' => TestType::Single->value, 'quantity' => 1]], $category->id);
+    $planC = makePlan([['type' => TestType::Single->value, 'quantity' => 1]], $category->id);
+
+    $anchorA = Entitlements::assignPlan($subscriber, $planA, now())->first();
+    Entitlements::assignPlan($subscriber, $planB, now())->first();
+
+    Entitlements::changePlan($anchorA, $planC, PlanTransitionMode::Immediate);
+})->throws(PlanCategoryExclusivityViolation::class);
