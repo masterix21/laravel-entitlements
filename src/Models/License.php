@@ -30,6 +30,8 @@ use LucaLongo\LaravelEntitlements\Exceptions\InvalidEntitlementTypeException;
  * @property Carbon $starts_at
  * @property Carbon|null $ends_at
  * @property int $remaining
+ * @property CarbonInterface|null $next_billing_at
+ * @property Plan|null $plan
  *
  * @method static Builder<static> valid()
  * @method static Builder<static> ofType(EntitlementType $type)
@@ -103,10 +105,6 @@ final class License extends Model
     public function nextBillingAt(): Attribute
     {
         return Attribute::get(function (): ?CarbonInterface {
-            if ($this->starts_at === null) {
-                return null;
-            }
-
             $billingPeriod = $this->plan?->billing_period;
 
             if ($billingPeriod === null) {

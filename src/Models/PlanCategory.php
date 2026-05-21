@@ -9,6 +9,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Translatable\HasTranslations;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property int $sort
+ * @property bool $allows_multiple_active_plans
+ */
 final class PlanCategory extends Model
 {
     use HasFactory;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LucaLongo\LaravelEntitlements\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,24 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LucaLongo\LaravelEntitlements\Enums\PlanTransitionMode;
 use LucaLongo\LaravelEntitlements\Enums\PlanTransitionStatus;
 
+/**
+ * @property int $id
+ * @property int $anchor_license_id
+ * @property int $target_plan_id
+ * @property PlanTransitionMode $apply_mode
+ * @property PlanTransitionStatus $status
+ * @property CarbonInterface $scheduled_at
+ * @property CarbonInterface|null $applied_at
+ * @property array<int, int>|null $quantity_overrides
+ * @property string|null $failure_reason
+ * @property int|null $new_anchor_license_id
+ * @property License $anchorLicense
+ * @property License|null $newAnchorLicense
+ * @property Plan $targetPlan
+ *
+ * @method static Builder<static> pending()
+ * @method static Builder<static> due()
+ */
 class PlanTransition extends Model
 {
     use HasFactory;
