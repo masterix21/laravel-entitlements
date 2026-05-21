@@ -18,6 +18,10 @@ final class PlanCategory extends Model
 
     protected $guarded = [];
 
+    protected $attributes = [
+        'allows_multiple_active_plans' => true,
+    ];
+
     public function getTable(): string
     {
         return (string) config('entitlements.table_names.plan_categories', 'entitlement_plan_categories');
@@ -32,6 +36,7 @@ final class PlanCategory extends Model
     {
         return [
             'sort' => 'integer',
+            'allows_multiple_active_plans' => 'boolean',
         ];
     }
 }
