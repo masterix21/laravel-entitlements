@@ -58,5 +58,6 @@
     "This license is part of a plan group and cannot be changed directly.": "此许可证属于某个套餐组,无法直接更改。",
     "This plan is no longer active and cannot be changed.": "此套餐已不再有效,无法更改。",
     "This plan change has already been processed and cannot be modified.": "此套餐变更已处理完毕,无法修改。",
-    "A plan without an end date cannot be changed at the end of the period. Use the immediate option instead.": "没有结束日期的套餐无法在周期结束时变更,请改用“立即”选项。"
+    "A plan without an end date cannot be changed at the end of the period. Use the immediate option instead.": "没有结束日期的套餐无法在周期结束时变更,请改用“立即”选项。",
+    "The selected plan and quantities are identical to the current ones. Change at least one value.": "所选套餐和数量与当前完全相同。请至少修改一个值。"
 }

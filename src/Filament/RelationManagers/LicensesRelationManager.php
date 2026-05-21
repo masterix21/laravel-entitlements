@@ -31,6 +31,7 @@ use LucaLongo\LaravelEntitlements\Exceptions\AnchorNotActiveForTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\EndOfPeriodTransitionRequiresEndsAt;
 use LucaLongo\LaravelEntitlements\Exceptions\IncompatiblePlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\InsufficientCapacityForTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\NoOpPlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\PlanCategoryExclusivityViolation;
 use LucaLongo\LaravelEntitlements\Exceptions\TransitionAlreadyResolved;
 use LucaLongo\LaravelEntitlements\Facades\Entitlements;
@@ -237,6 +238,7 @@ final class LicensesRelationManager extends RelationManager
                                         ->get()
                                         ->mapWithKeys(fn (Plan $plan): array => [$plan->id => self::planOptionLabel($plan)])
                                         ->all())
+                                    ->default($record->plan_id)
                                     ->required()
                                     ->live()
                                     ->native(false)
@@ -273,7 +275,8 @@ final class LicensesRelationManager extends RelationManager
                             |IncompatiblePlanTransition
                             |InsufficientCapacityForTransition
                             |AnchorNotActiveForTransition
-                            |EndOfPeriodTransitionRequiresEndsAt $e
+                            |EndOfPeriodTransitionRequiresEndsAt
+                            |NoOpPlanTransition $e
                         ) {
                             self::notifyDomainError($e);
 

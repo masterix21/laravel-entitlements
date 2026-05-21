@@ -205,6 +205,35 @@ it('rejects transition that would violate category exclusivity', function (): vo
     Entitlements::changePlan($anchorA, $planC, PlanTransitionMode::Immediate);
 })->throws(PlanCategoryExclusivityViolation::class);
 
+it('rejects a no-op plan change (same plan and quantities)', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([
+        ['type' => TestType::Single->value, 'quantity' => 1],
+        ['type' => TestType::Pooled->value, 'quantity' => 50, 'is_flexible' => true],
+    ]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now(), [
+        $plan->items->firstWhere('type', TestType::Pooled)->id => 100,
+    ])->first();
+
+    Entitlements::changePlan($anchor, $plan, PlanTransitionMode::Immediate, [
+        $plan->items->firstWhere('type', TestType::Pooled)->id => 100,
+    ]);
+})->throws(NoOpPlanTransition::class);
+
+it('allows changing only quantities on the same plan', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([
+        ['type' => TestType::Pooled->value, 'quantity' => 50, 'is_flexible' => true],
+    ]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+
+    $transition = Entitlements::changePlan($anchor, $plan, PlanTransitionMode::Immediate, [
+        $plan->items->first()->id => 75,
+    ]);
+
+    expect($transition->status->value)->toBe('applied');
+});
+
 it('rejects assignPlan when category disallows multiple active plans and one already exists', function (): void {
     $subscriber = Subscriber::create(['name' => 'acme']);
     $category = PlanCategory::create(['name' => 'Exclusive', 'allows_multiple_active_plans' => false]);
@@ -349,6 +378,7 @@ it('rejects cancellation of a non-pending transition', function (): void {
 })->throws(TransitionAlreadyResolved::class);
 
 use LucaLongo\LaravelEntitlements\Events\PlanTransitionFailed;
+use LucaLongo\LaravelEntitlements\Exceptions\NoOpPlanTransition;
 
 it('marks transition as failed when revalidation in apply phase fails', function (): void {
     Event::fake([PlanTransitionFailed::class]);

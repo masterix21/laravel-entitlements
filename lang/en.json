@@ -58,5 +58,6 @@
     "This license is part of a plan group and cannot be changed directly.": "This license is part of a plan group and cannot be changed directly.",
     "This plan is no longer active and cannot be changed.": "This plan is no longer active and cannot be changed.",
     "This plan change has already been processed and cannot be modified.": "This plan change has already been processed and cannot be modified.",
-    "A plan without an end date cannot be changed at the end of the period. Use the immediate option instead.": "A plan without an end date cannot be changed at the end of the period. Use the immediate option instead."
+    "A plan without an end date cannot be changed at the end of the period. Use the immediate option instead.": "A plan without an end date cannot be changed at the end of the period. Use the immediate option instead.",
+    "The selected plan and quantities are identical to the current ones. Change at least one value.": "The selected plan and quantities are identical to the current ones. Change at least one value."
 }

@@ -22,6 +22,7 @@ use LucaLongo\LaravelEntitlements\Exceptions\AnchorNotActiveForTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\EndOfPeriodTransitionRequiresEndsAt;
 use LucaLongo\LaravelEntitlements\Exceptions\IncompatiblePlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\InsufficientCapacityForTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\NoOpPlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\PlanCategoryExclusivityViolation;
 use LucaLongo\LaravelEntitlements\Exceptions\TransitionAlreadyResolved;
 use LucaLongo\LaravelEntitlements\Models\License;
@@ -326,6 +327,10 @@ final class Entitlements
             ->orWhere('parent_id', $anchor->id)
             ->get();
 
+        if ($newPlan->id === $anchor->plan_id && $this->isNoOpChange($groupLicenses, $newPlan, $quantityOverrides)) {
+            throw NoOpPlanTransition::make();
+        }
+
         $groupLicenseIds = $groupLicenses->pluck('id');
 
         $openUsageLicenseIds = LicenseUsage::query()
@@ -371,6 +376,37 @@ final class Entitlements
             $newPlan,
             excludeAnchorId: $anchor->id,
         );
+    }
+
+    /**
+     * @param  Collection<int, License>  $groupLicenses
+     * @param  array<int, int>  $quantityOverrides
+     */
+    private function isNoOpChange(Collection $groupLicenses, Plan $newPlan, array $quantityOverrides): bool
+    {
+        $currentByType = $groupLicenses
+            ->groupBy(fn (License $l) => $l->type->value)
+            ->map(fn ($licenses) => (int) $licenses->sum('slot_total'));
+
+        $newByType = $newPlan->items->mapWithKeys(function (PlanItem $item) use ($quantityOverrides): array {
+            $effective = ($item->is_flexible && isset($quantityOverrides[$item->id]))
+                ? (int) $quantityOverrides[$item->id]
+                : (int) $item->quantity;
+
+            return [$item->type->value => $effective];
+        });
+
+        if ($currentByType->keys()->sort()->values()->all() !== $newByType->keys()->sort()->values()->all()) {
+            return false;
+        }
+
+        foreach ($newByType as $type => $value) {
+            if (($currentByType[$type] ?? null) !== $value) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function assertCategoryExclusivity(
