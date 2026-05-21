@@ -15,6 +15,7 @@ use LucaLongo\LaravelEntitlements\Enums\PlanTransitionStatus;
 use LucaLongo\LaravelEntitlements\Events\LicenseReconciled;
 use LucaLongo\LaravelEntitlements\Events\PlanAssigned;
 use LucaLongo\LaravelEntitlements\Events\PlanTransitionApplied;
+use LucaLongo\LaravelEntitlements\Events\PlanTransitionCancelled;
 use LucaLongo\LaravelEntitlements\Events\PlanTransitionFailed;
 use LucaLongo\LaravelEntitlements\Events\PlanTransitionScheduled;
 use LucaLongo\LaravelEntitlements\Exceptions\AnchorNotActiveForTransition;
@@ -22,6 +23,7 @@ use LucaLongo\LaravelEntitlements\Exceptions\EndOfPeriodTransitionRequiresEndsAt
 use LucaLongo\LaravelEntitlements\Exceptions\IncompatiblePlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\InsufficientCapacityForTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\PlanCategoryExclusivityViolation;
+use LucaLongo\LaravelEntitlements\Exceptions\TransitionAlreadyResolved;
 use LucaLongo\LaravelEntitlements\Models\License;
 use LucaLongo\LaravelEntitlements\Models\LicenseUsage;
 use LucaLongo\LaravelEntitlements\Models\Plan;
@@ -175,6 +177,16 @@ final class Entitlements
         PlanTransitionScheduled::dispatch($transition);
 
         return $transition;
+    }
+
+    public function cancelTransition(PlanTransition $transition): void
+    {
+        if ($transition->status !== PlanTransitionStatus::Pending) {
+            throw TransitionAlreadyResolved::forStatus($transition->status->value);
+        }
+
+        $transition->update(['status' => PlanTransitionStatus::Cancelled->value]);
+        PlanTransitionCancelled::dispatch($transition->fresh());
     }
 
     public function applyDueTransitions(): int

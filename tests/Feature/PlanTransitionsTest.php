@@ -296,3 +296,31 @@ it('runs entitlements:apply-transitions command', function (): void {
 
     expect($transition->fresh()->status)->toBe(PlanTransitionStatus::Applied);
 });
+
+use LucaLongo\LaravelEntitlements\Events\PlanTransitionCancelled;
+use LucaLongo\LaravelEntitlements\Exceptions\TransitionAlreadyResolved;
+
+it('cancels a pending transition', function (): void {
+    Event::fake([PlanTransitionCancelled::class]);
+
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $transition = Entitlements::changePlan($anchor, $target, PlanTransitionMode::EndOfPeriod);
+
+    Entitlements::cancelTransition($transition);
+
+    expect($transition->fresh()->status)->toBe(PlanTransitionStatus::Cancelled);
+    Event::assertDispatched(PlanTransitionCancelled::class);
+});
+
+it('rejects cancellation of a non-pending transition', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $transition = Entitlements::changePlan($anchor, $target, PlanTransitionMode::Immediate);
+
+    Entitlements::cancelTransition($transition->fresh());
+})->throws(TransitionAlreadyResolved::class);
