@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Filament\Pages\Enums\SubNavigationPosition;
+use LucaLongo\LaravelEntitlements\Filament\Clusters\SubscriptionPlansCluster;
 use LucaLongo\LaravelEntitlements\Filament\Resources\PlanCategories\PlanCategoryResource;
 use LucaLongo\LaravelEntitlements\Filament\Resources\Plans\PlanResource;
 use LucaLongo\LaravelEntitlements\Models\Plan;
@@ -15,9 +17,16 @@ it('PlanCategoryResource targets the package PlanCategory model', function (): v
     expect(PlanCategoryResource::getModel())->toBe(PlanCategory::class);
 });
 
-it('PlanCategoryResource nests under the Subscription Plans navigation item', function (): void {
-    expect(PlanCategoryResource::getNavigationParentItem())->toBe(__('Subscription Plans'));
-    expect(PlanResource::getNavigationLabel())->toBe(__('Subscription Plans'));
+it('groups both resources under the Subscription Plans cluster with top navigation', function (): void {
+    expect(PlanResource::getCluster())->toBe(SubscriptionPlansCluster::class)
+        ->and(PlanCategoryResource::getCluster())->toBe(SubscriptionPlansCluster::class)
+        ->and(SubscriptionPlansCluster::getNavigationLabel())->toBe(__('Subscription Plans'))
+        ->and(SubscriptionPlansCluster::getSubNavigationPosition())->toBe(SubNavigationPosition::Top);
+});
+
+it('exposes tab labels for the cluster sub-navigation', function (): void {
+    expect(PlanResource::getNavigationLabel())->toBe(__('Plans'))
+        ->and(PlanCategoryResource::getNavigationLabel())->toBe(__('Plan Categories'));
 });
 
 it('exposes translated model labels', function (): void {

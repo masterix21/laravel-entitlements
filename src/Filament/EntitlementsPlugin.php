@@ -52,6 +52,13 @@ final class EntitlementsPlugin implements Plugin
         }
 
         $panel->resources($resources);
+
+        if ($resources !== []) {
+            $panel->discoverClusters(
+                in: __DIR__.'/Clusters',
+                for: 'LucaLongo\\LaravelEntitlements\\Filament\\Clusters',
+            );
+        }
     }
 
     public function boot(Panel $panel): void {}

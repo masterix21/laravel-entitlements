@@ -37,7 +37,7 @@ class TestCase extends Orchestra
 
     protected function getPackageProviders($app)
     {
-        return [
+        $optional = [
             FilamentServiceProvider::class,
             ActionsServiceProvider::class,
             FormsServiceProvider::class,
@@ -51,9 +51,13 @@ class TestCase extends Orchestra
             BladeIconsServiceProvider::class,
             BladeHeroiconsServiceProvider::class,
             BladeCaptureDirectiveServiceProvider::class,
-            LaravelEntitlementsServiceProvider::class,
             AdminPanelProvider::class,
         ];
+
+        $providers = array_values(array_filter($optional, fn (string $class): bool => class_exists($class)));
+        $providers[] = LaravelEntitlementsServiceProvider::class;
+
+        return $providers;
     }
 
     public function getEnvironmentSetUp($app)
@@ -70,7 +74,11 @@ class TestCase extends Orchestra
             (include $migration->getRealPath())->up();
         }
 
-        foreach (File::allFiles(__DIR__.'/../database/migrations') as $migration) {
+        $migrations = collect(File::allFiles(__DIR__.'/../database/migrations'))
+            ->sortBy(fn ($m) => (str_starts_with($m->getFilename(), 'create_') ? '0_' : '1_').$m->getFilename())
+            ->values();
+
+        foreach ($migrations as $migration) {
             (include $migration->getRealPath())->up();
         }
     }

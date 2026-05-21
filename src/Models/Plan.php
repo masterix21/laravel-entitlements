@@ -19,6 +19,7 @@ use Spatie\Translatable\HasTranslations;
  * @property BillingPeriod $billing_period
  * @property bool $is_recurring
  * @property bool $is_active
+ * @property PlanCategory|null $category
  *
  * @method static Builder<static> active()
  */

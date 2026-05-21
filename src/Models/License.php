@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LucaLongo\LaravelEntitlements\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementType;
+use LucaLongo\LaravelEntitlements\Enums\PlanTransitionStatus;
 use LucaLongo\LaravelEntitlements\Exceptions\InvalidEntitlementTypeException;
 
 /**
@@ -28,6 +30,8 @@ use LucaLongo\LaravelEntitlements\Exceptions\InvalidEntitlementTypeException;
  * @property Carbon $starts_at
  * @property Carbon|null $ends_at
  * @property int $remaining
+ * @property CarbonInterface|null $next_billing_at
+ * @property Plan|null $plan
  *
  * @method static Builder<static> valid()
  * @method static Builder<static> ofType(EntitlementType $type)
@@ -74,9 +78,48 @@ final class License extends Model
         return $this->hasMany($model);
     }
 
+    public function transitions(): HasMany
+    {
+        /** @var class-string<PlanTransition> $model */
+        $model = config('entitlements.models.plan_transition', PlanTransition::class);
+
+        return $this->hasMany($model, 'anchor_license_id');
+    }
+
+    public function pendingTransition(): ?PlanTransition
+    {
+        /** @var PlanTransition|null $transition */
+        $transition = $this->transitions()
+            ->where('status', PlanTransitionStatus::Pending->value)
+            ->orderBy('scheduled_at')
+            ->first();
+
+        return $transition;
+    }
+
     public function remaining(): Attribute
     {
         return Attribute::get(fn (): int => max(0, $this->slot_total - $this->slot_used));
+    }
+
+    public function nextBillingAt(): Attribute
+    {
+        return Attribute::get(function (): ?CarbonInterface {
+            $billingPeriod = $this->plan?->billing_period;
+
+            if ($billingPeriod === null) {
+                return $this->ends_at;
+            }
+
+            $now = now();
+            $cursor = $this->starts_at->copy();
+
+            while ($cursor->lessThanOrEqualTo($now)) {
+                $cursor = $billingPeriod->advance($cursor);
+            }
+
+            return $cursor;
+        });
     }
 
     public function isValid(): bool

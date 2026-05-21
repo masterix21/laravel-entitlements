@@ -9,6 +9,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Translatable\HasTranslations;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property int $sort
+ * @property bool $allows_multiple_active_plans
+ */
 final class PlanCategory extends Model
 {
     use HasFactory;
@@ -17,6 +23,10 @@ final class PlanCategory extends Model
     public array $translatable = ['name'];
 
     protected $guarded = [];
+
+    protected $attributes = [
+        'allows_multiple_active_plans' => true,
+    ];
 
     public function getTable(): string
     {
@@ -32,6 +42,7 @@ final class PlanCategory extends Model
     {
         return [
             'sort' => 'integer',
+            'allows_multiple_active_plans' => 'boolean',
         ];
     }
 }
