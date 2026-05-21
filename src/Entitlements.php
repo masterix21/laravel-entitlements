@@ -38,6 +38,12 @@ final class Entitlements
      */
     public function assignPlan(Model $subscriber, Plan $plan, CarbonInterface $startsAt, array $quantityOverrides = []): Collection
     {
+        $this->assertCategoryExclusivity(
+            $subscriber->getMorphClass(),
+            $subscriber->getKey(),
+            $plan,
+        );
+
         $endsAt = $plan->is_recurring
             ? null
             : $plan->billing_period->advance($startsAt);
@@ -359,22 +365,39 @@ final class Entitlements
             }
         }
 
-        $category = $newPlan->category;
-        if ($category !== null && ! $category->allows_multiple_active_plans) {
-            $conflict = License::query()
-                ->where('subscriber_type', $anchor->subscriber_type)
-                ->where('subscriber_id', $anchor->subscriber_id)
-                ->whereNull('parent_id')
-                ->where('id', '!=', $anchor->id)
-                ->whereHas('plan', fn ($q) => $q->where('plan_category_id', $category->id))
-                ->where(function ($q): void {
-                    $q->whereNull('ends_at')->orWhere('ends_at', '>', now());
-                })
-                ->exists();
+        $this->assertCategoryExclusivity(
+            $anchor->subscriber_type,
+            $anchor->subscriber_id,
+            $newPlan,
+            excludeAnchorId: $anchor->id,
+        );
+    }
 
-            if ($conflict) {
-                throw PlanCategoryExclusivityViolation::forCategory($category->id);
-            }
+    private function assertCategoryExclusivity(
+        string $subscriberType,
+        int|string $subscriberId,
+        Plan $plan,
+        ?int $excludeAnchorId = null,
+    ): void {
+        $category = $plan->category;
+
+        if ($category === null || $category->allows_multiple_active_plans) {
+            return;
+        }
+
+        $conflict = License::query()
+            ->where('subscriber_type', $subscriberType)
+            ->where('subscriber_id', $subscriberId)
+            ->whereNull('parent_id')
+            ->when($excludeAnchorId !== null, fn ($q) => $q->where('id', '!=', $excludeAnchorId))
+            ->whereHas('plan', fn ($q) => $q->where('plan_category_id', $category->id))
+            ->where(function ($q): void {
+                $q->whereNull('ends_at')->orWhere('ends_at', '>', now());
+            })
+            ->exists();
+
+        if ($conflict) {
+            throw PlanCategoryExclusivityViolation::forCategory($category->id);
         }
     }
 

@@ -191,7 +191,7 @@ it('rejects transition when target capacity is below current usage', function ()
 
 it('rejects transition that would violate category exclusivity', function (): void {
     $subscriber = Subscriber::create(['name' => 'acme']);
-    $category = PlanCategory::create(['name' => 'Exclusive', 'allows_multiple_active_plans' => false]);
+    $category = PlanCategory::create(['name' => 'Exclusive', 'allows_multiple_active_plans' => true]);
 
     $planA = makePlan([['type' => TestType::Single->value, 'quantity' => 1]], $category->id);
     $planB = makePlan([['type' => TestType::Single->value, 'quantity' => 1]], $category->id);
@@ -200,8 +200,33 @@ it('rejects transition that would violate category exclusivity', function (): vo
     $anchorA = Entitlements::assignPlan($subscriber, $planA, now())->first();
     Entitlements::assignPlan($subscriber, $planB, now())->first();
 
+    $category->update(['allows_multiple_active_plans' => false]);
+
     Entitlements::changePlan($anchorA, $planC, PlanTransitionMode::Immediate);
 })->throws(PlanCategoryExclusivityViolation::class);
+
+it('rejects assignPlan when category disallows multiple active plans and one already exists', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $category = PlanCategory::create(['name' => 'Exclusive', 'allows_multiple_active_plans' => false]);
+
+    $planA = makePlan([['type' => TestType::Single->value, 'quantity' => 1]], $category->id);
+    $planB = makePlan([['type' => TestType::Single->value, 'quantity' => 1]], $category->id);
+
+    Entitlements::assignPlan($subscriber, $planA, now());
+
+    Entitlements::assignPlan($subscriber, $planB, now());
+})->throws(PlanCategoryExclusivityViolation::class);
+
+it('allows assignPlan in exclusive category when no active plan exists', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $category = PlanCategory::create(['name' => 'Exclusive', 'allows_multiple_active_plans' => false]);
+
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]], $category->id);
+
+    $licenses = Entitlements::assignPlan($subscriber, $plan, now());
+
+    expect($licenses)->toHaveCount(1);
+});
 
 use Illuminate\Support\Facades\Event;
 use LucaLongo\LaravelEntitlements\Events\PlanTransitionApplied;
