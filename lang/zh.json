@@ -51,5 +51,12 @@
     "Expired": "已过期",
     "Allow multiple active plans": "允许多个有效套餐",
     "When disabled, a subscriber can have at most one active plan in this category.": "禁用时,订阅者在此类别中最多只能拥有一个有效套餐。",
-    "Operation not permitted": "操作不允许"
+    "Operation not permitted": "操作不允许",
+    "There is already an active plan in this category.": "此类别中已存在一个有效套餐。",
+    "The selected plan does not include the “:type” feature you are currently using.": "所选套餐不包含您当前正在使用的 “:type” 功能。",
+    "The selected plan offers :available “:type” but :used are already in use.": "所选套餐提供 :available 个 “:type”,但已使用 :used 个。",
+    "This license is part of a plan group and cannot be changed directly.": "此许可证属于某个套餐组,无法直接更改。",
+    "This plan is no longer active and cannot be changed.": "此套餐已不再有效,无法更改。",
+    "This plan change has already been processed and cannot be modified.": "此套餐变更已处理完毕,无法修改。",
+    "A plan without an end date cannot be changed at the end of the period. Use the immediate option instead.": "没有结束日期的套餐无法在周期结束时变更,请改用“立即”选项。"
 }

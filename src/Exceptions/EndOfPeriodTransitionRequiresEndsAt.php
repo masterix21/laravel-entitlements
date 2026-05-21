@@ -10,6 +10,6 @@ final class EndOfPeriodTransitionRequiresEndsAt extends RuntimeException
 {
     public static function make(): self
     {
-        return new self('End-of-period transitions require an anchor with a non-null ends_at.');
+        return new self((string) __('A plan without an end date cannot be changed at the end of the period. Use the immediate option instead.'));
     }
 }

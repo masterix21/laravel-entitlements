@@ -51,5 +51,12 @@
     "Expired": "Expired",
     "Allow multiple active plans": "Allow multiple active plans",
     "When disabled, a subscriber can have at most one active plan in this category.": "When disabled, a subscriber can have at most one active plan in this category.",
-    "Operation not permitted": "Operation not permitted"
+    "Operation not permitted": "Operation not permitted",
+    "There is already an active plan in this category.": "There is already an active plan in this category.",
+    "The selected plan does not include the “:type” feature you are currently using.": "The selected plan does not include the “:type” feature you are currently using.",
+    "The selected plan offers :available “:type” but :used are already in use.": "The selected plan offers :available “:type” but :used are already in use.",
+    "This license is part of a plan group and cannot be changed directly.": "This license is part of a plan group and cannot be changed directly.",
+    "This plan is no longer active and cannot be changed.": "This plan is no longer active and cannot be changed.",
+    "This plan change has already been processed and cannot be modified.": "This plan change has already been processed and cannot be modified.",
+    "A plan without an end date cannot be changed at the end of the period. Use the immediate option instead.": "A plan without an end date cannot be changed at the end of the period. Use the immediate option instead."
 }

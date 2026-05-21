@@ -10,11 +10,11 @@ final class AnchorNotActiveForTransition extends RuntimeException
 {
     public static function notAnchor(int $licenseId): self
     {
-        return new self("License [{$licenseId}] is not an anchor license.");
+        return new self((string) __('This license is part of a plan group and cannot be changed directly.'));
     }
 
     public static function expired(int $licenseId): self
     {
-        return new self("Anchor license [{$licenseId}] is no longer active.");
+        return new self((string) __('This plan is no longer active and cannot be changed.'));
     }
 }

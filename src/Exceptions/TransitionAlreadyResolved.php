@@ -10,6 +10,6 @@ final class TransitionAlreadyResolved extends RuntimeException
 {
     public static function forStatus(string $status): self
     {
-        return new self("Plan transition is already resolved with status [{$status}].");
+        return new self((string) __('This plan change has already been processed and cannot be modified.'));
     }
 }

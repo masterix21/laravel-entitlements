@@ -51,5 +51,12 @@
     "Expired": "Истёк",
     "Allow multiple active plans": "Разрешить несколько активных планов",
     "When disabled, a subscriber can have at most one active plan in this category.": "Если отключено, у подписчика может быть не более одного активного плана в этой категории.",
-    "Operation not permitted": "Операция не разрешена"
+    "Operation not permitted": "Операция не разрешена",
+    "There is already an active plan in this category.": "В этой категории уже есть активный план.",
+    "The selected plan does not include the “:type” feature you are currently using.": "Выбранный план не включает функцию «:type», которой вы сейчас пользуетесь.",
+    "The selected plan offers :available “:type” but :used are already in use.": "Выбранный план предоставляет :available «:type», но уже используется :used.",
+    "This license is part of a plan group and cannot be changed directly.": "Эта лицензия входит в группу плана и не может быть изменена напрямую.",
+    "This plan is no longer active and cannot be changed.": "Этот план больше не активен и не может быть изменён.",
+    "This plan change has already been processed and cannot be modified.": "Это изменение плана уже обработано и не может быть изменено.",
+    "A plan without an end date cannot be changed at the end of the period. Use the immediate option instead.": "План без даты окончания нельзя изменить в конце периода. Используйте вариант «Немедленно»."
 }
