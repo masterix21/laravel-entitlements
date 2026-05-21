@@ -225,7 +225,7 @@ final class LicensesRelationManager extends RelationManager
                                 Group::make()
                                     ->columnSpanFull()
                                     ->columns(2)
-                                    ->schema(fn (Get $get): array => self::changePlanQuantityFields($get('target_plan_id'))),
+                                    ->schema(fn (Get $get): array => self::changePlanQuantityFields($get('target_plan_id'), $record)),
                             ]),
                     ])
                     ->action(function (array $data, License $record): void {
@@ -333,10 +333,12 @@ final class LicensesRelationManager extends RelationManager
 
     /**
      * Build a numeric input per flexible item of the targeted plan for plan changes.
+     * Prefills each field with the current slot_total of the anchor's group for the same type,
+     * falling back to the plan item's default quantity when no matching license exists.
      *
      * @return array<int, TextInput>
      */
-    private static function changePlanQuantityFields(mixed $planId): array
+    private static function changePlanQuantityFields(mixed $planId, License $anchor): array
     {
         if (empty($planId)) {
             return [];
@@ -348,6 +350,12 @@ final class LicensesRelationManager extends RelationManager
             return [];
         }
 
+        $currentByType = License::query()
+            ->where(fn ($q) => $q->where('id', $anchor->id)->orWhere('parent_id', $anchor->id))
+            ->get()
+            ->groupBy(fn (License $l) => $l->type->value)
+            ->map(fn ($licenses) => (int) $licenses->sum('slot_total'));
+
         return $plan->items
             ->where('is_flexible', true)
             ->map(fn (PlanItem $item): TextInput => TextInput::make("quantity_overrides.{$item->id}")
@@ -355,7 +363,7 @@ final class LicensesRelationManager extends RelationManager
                 ->numeric()
                 ->minValue(1)
                 ->required()
-                ->default($item->quantity))
+                ->default($currentByType[$item->type->value] ?? $item->quantity))
             ->values()
             ->all();
     }
