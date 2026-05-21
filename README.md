@@ -506,7 +506,6 @@ Runs Laravel Pint with the default preset.
 ## Credits
 
 - [Luca Longo](https://github.com/masterix21)
-- Domain logic extracted and generalized from the [Totem in Cloud](https://github.com/) production codebase.
 
 ## License
 
