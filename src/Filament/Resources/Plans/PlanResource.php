@@ -9,12 +9,12 @@ use CodeWithDennis\FilamentLucideIcons\Enums\LucideIcon;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
+use LucaLongo\LaravelEntitlements\Filament\Clusters\SubscriptionPlansCluster;
 use LucaLongo\LaravelEntitlements\Filament\Concerns\HasTranslations;
 use LucaLongo\LaravelEntitlements\Filament\Resources\Plans\Pages\ListPlans;
 use LucaLongo\LaravelEntitlements\Filament\Resources\Plans\Schemas\PlanForm;
 use LucaLongo\LaravelEntitlements\Filament\Resources\Plans\Tables\PlansTable;
 use LucaLongo\LaravelEntitlements\Models\Plan;
-use UnitEnum;
 
 final class PlanResource extends Resource
 {
@@ -24,11 +24,11 @@ final class PlanResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = LucideIcon::Package;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Licensing';
+    protected static ?string $cluster = SubscriptionPlansCluster::class;
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?int $navigationSort = 21;
+    protected static ?int $navigationSort = 1;
 
     public static function getModelLabel(): string
     {
@@ -42,7 +42,7 @@ final class PlanResource extends Resource
 
     public static function getNavigationLabel(): string
     {
-        return __('Subscription Plans');
+        return __('Plans');
     }
 
     public static function form(Schema $schema): Schema
