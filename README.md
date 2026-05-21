@@ -262,15 +262,30 @@ Only transitions still in the `pending` status can be cancelled.
 
 ### Apply due transitions
 
-Pending `EndOfPeriod` transitions are materialized by the
+Pending `EndOfPeriod` and `AtDate` transitions are materialized by the
 `entitlements:apply-transitions` artisan command. Register it on the scheduler so
-deferred changes go live without manual intervention:
+deferred changes go live without manual intervention.
+
+**Laravel 11/12 (`routes/console.php`):**
 
 ```php
-use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Schedule;
 
-$schedule->command('entitlements:apply-transitions')->everyMinute();
+Schedule::command('entitlements:apply-transitions')->everyMinute();
 ```
+
+**Laravel 10 and earlier (`app/Console/Kernel.php`):**
+
+```php
+protected function schedule(Schedule $schedule): void
+{
+    $schedule->command('entitlements:apply-transitions')->everyMinute();
+}
+```
+
+Pick the cadence that fits your needs (`->everyMinute()`, `->everyFiveMinutes()`,
+`->hourly()`, …). The shorter the interval, the closer the apply time is to the
+configured `scheduled_at`.
 
 You can also trigger the same logic from code (e.g. inside a job):
 
