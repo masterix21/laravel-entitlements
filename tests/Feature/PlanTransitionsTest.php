@@ -262,8 +262,6 @@ it('schedules an end-of-period transition without altering the current group', f
     Event::assertNotDispatched(PlanTransitionApplied::class);
 });
 
-use LucaLongo\LaravelEntitlements\Commands\ApplyDuePlanTransitionsCommand;
-
 it('materializes due transitions via applyDueTransitions', function (): void {
     $subscriber = Subscriber::create(['name' => 'acme']);
     $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
@@ -324,3 +322,29 @@ it('rejects cancellation of a non-pending transition', function (): void {
 
     Entitlements::cancelTransition($transition->fresh());
 })->throws(TransitionAlreadyResolved::class);
+
+use LucaLongo\LaravelEntitlements\Events\PlanTransitionFailed;
+
+it('marks transition as failed when revalidation in apply phase fails', function (): void {
+    Event::fake([PlanTransitionFailed::class]);
+
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Pooled->value, 'quantity' => 100]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $endsAt = $anchor->ends_at;
+
+    $target = makePlan([['type' => TestType::Pooled->value, 'quantity' => 3]]);
+    $transition = Entitlements::changePlan($anchor, $target, PlanTransitionMode::EndOfPeriod);
+
+    // Consume more than target capacity after scheduling
+    Entitlements::consume($subscriber, TestType::Pooled, $subscriber, 10);
+
+    $this->travelTo($endsAt->copy()->addSecond());
+
+    Entitlements::applyDueTransitions();
+
+    expect($transition->fresh()->status)->toBe(PlanTransitionStatus::Failed)
+        ->and($transition->fresh()->failure_reason)->not->toBeNull();
+
+    Event::assertDispatched(PlanTransitionFailed::class);
+});
