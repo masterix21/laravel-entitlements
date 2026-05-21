@@ -47,5 +47,6 @@
     "End of period": "A fine periodo",
     "Immediate": "Immediato",
     "Pending plan change": "Cambio pianificato a :plan il :date",
-    "Cancel pending change": "Annulla cambio pianificato"
+    "Cancel pending change": "Annulla cambio pianificato",
+    "Expired": "Scaduta"
 }

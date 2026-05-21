@@ -47,5 +47,6 @@
     "End of period": "End of period",
     "Immediate": "Immediate",
     "Pending plan change": "Pending change to :plan on :date",
-    "Cancel pending change": "Cancel pending change"
+    "Cancel pending change": "Cancel pending change",
+    "Expired": "Expired"
 }

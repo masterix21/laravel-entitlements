@@ -47,5 +47,6 @@
     "End of period": "周期结束时",
     "Immediate": "立即",
     "Pending plan change": "计划于 :date 更改为 :plan",
-    "Cancel pending change": "取消计划中的更改"
+    "Cancel pending change": "取消计划中的更改",
+    "Expired": "已过期"
 }

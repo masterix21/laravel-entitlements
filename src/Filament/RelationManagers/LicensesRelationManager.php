@@ -49,7 +49,9 @@ final class LicensesRelationManager extends RelationManager
             ]))
             ->modifyQueryUsing(fn (Builder $query): Builder => $query
                 ->whereNull('parent_id')
-                ->with(['plan.category', 'children']))
+                ->with(['plan.category', 'children'])
+                ->orderByRaw('CASE WHEN ends_at IS NULL THEN 1 WHEN ends_at > ? THEN 0 ELSE 2 END', [now()])
+                ->orderBy('ends_at'))
             ->columns([
                 BadgeableColumn::make('plan.name')
                     ->label(__('Plan'))
@@ -64,6 +66,10 @@ final class LicensesRelationManager extends RelationManager
                         Badge::make('is_recurring')
                             ->label(fn (License $record): string => $record->plan->is_recurring ? __('Recurring') : __('Fixed-term'))
                             ->color(fn (License $record): string => $record->plan->is_recurring ? 'success' : 'gray'),
+                        Badge::make('expired')
+                            ->label(__('Expired'))
+                            ->color('danger')
+                            ->visible(fn (License $record): bool => $record->ends_at !== null && $record->ends_at->isPast()),
                     ]),
 
                 TextColumn::make('resource')
@@ -195,7 +201,8 @@ final class LicensesRelationManager extends RelationManager
                     ->label(__('Change plan'))
                     ->icon('heroicon-o-arrows-right-left')
                     ->iconButton()
-                    ->visible(fn (License $record): bool => $record->parent_id === null)
+                    ->visible(fn (License $record): bool => $record->parent_id === null
+                        && ($record->ends_at === null || $record->ends_at->isFuture()))
                     ->form(fn (License $record): array => [
                         Grid::make(2)
                             ->schema([

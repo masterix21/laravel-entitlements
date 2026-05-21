@@ -47,5 +47,6 @@
     "End of period": "В конце периода",
     "Immediate": "Немедленно",
     "Pending plan change": "Запланирована смена на :plan — :date",
-    "Cancel pending change": "Отменить запланированную смену"
+    "Cancel pending change": "Отменить запланированную смену",
+    "Expired": "Истёк"
 }
