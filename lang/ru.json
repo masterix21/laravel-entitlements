@@ -48,5 +48,7 @@
     "Immediate": "Немедленно",
     "Pending plan change": "Запланирована смена на :plan — :date",
     "Cancel pending change": "Отменить запланированную смену",
-    "Expired": "Истёк"
+    "Expired": "Истёк",
+    "Allow multiple active plans": "Разрешить несколько активных планов",
+    "When disabled, a subscriber can have at most one active plan in this category.": "Если отключено, у подписчика может быть не более одного активного плана в этой категории."
 }

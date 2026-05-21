@@ -48,5 +48,7 @@
     "Immediate": "Immediato",
     "Pending plan change": "Cambio pianificato a :plan il :date",
     "Cancel pending change": "Annulla cambio pianificato",
-    "Expired": "Scaduta"
+    "Expired": "Scaduta",
+    "Allow multiple active plans": "Consenti più piani attivi",
+    "When disabled, a subscriber can have at most one active plan in this category.": "Se disattivato, un abbonato può avere al massimo un piano attivo in questa categoria."
 }

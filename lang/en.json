@@ -48,5 +48,7 @@
     "Immediate": "Immediate",
     "Pending plan change": "Pending change to :plan on :date",
     "Cancel pending change": "Cancel pending change",
-    "Expired": "Expired"
+    "Expired": "Expired",
+    "Allow multiple active plans": "Allow multiple active plans",
+    "When disabled, a subscriber can have at most one active plan in this category.": "When disabled, a subscriber can have at most one active plan in this category."
 }
