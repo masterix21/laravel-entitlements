@@ -2,6 +2,54 @@
 
 All notable changes to `laravel-entitlements` will be documented in this file.
 
+## 1.1.0 - 2026-05-21
+
+Plan transitions (upgrade/downgrade) become a first-class concept, the Filament UI gains a cluster with top-tab navigation and a complete "Change plan" workflow, and category exclusivity can now be enforced on every assignment.
+
+### Plan transitions
+
+- New public API: `Entitlements::changePlan(License $anchor, Plan $newPlan, PlanTransitionMode $mode, array $quantityOverrides = [], ?CarbonInterface $scheduledAt = null): PlanTransition`.
+- `PlanTransitionMode` enum: `Immediate`, `EndOfPeriod`, `AtDate` (date-specific scheduling).
+- New `entitlement_plan_transitions` table storing `apply_mode`, `status`, `scheduled_at`, `applied_at`, `failure_reason`, `quantity_overrides`, `new_anchor_license_id`.
+- License groups are now immutable: every plan change creates a new group via `assignPlan`-style logic, migrates open `LicenseUsage` rows to the matching new license, closes the old group with `ends_at = transition_at`, and reconciles the new licenses.
+- Pre-validation (re-run at apply time) blocks: non-anchor licenses, expired anchors, missing types in the target plan, insufficient capacity, exclusive-category violations, no-op transitions (same plan + same quantities).
+- `AtDate` mode requires a future scheduled date.
+- Perpetual plans (no `ends_at`) no longer reject `EndOfPeriod`: the transition is scheduled on the computed next billing cycle via the new `License::next_billing_at` accessor.
+- `Entitlements::cancelTransition(PlanTransition)` cancels a pending transition.
+- `Entitlements::applyDueTransitions(): int` materializes all `pending` rows with `scheduled_at <= now`; isolated failures don't stop siblings.
+- New artisan command `entitlements:apply-transitions` — register it in your scheduler (e.g. `Schedule::command('entitlements:apply-transitions')->everyMinute();`) to apply scheduled transitions automatically.
+- Events: `PlanTransitionScheduled`, `PlanTransitionApplied`, `PlanTransitionFailed`, `PlanTransitionCancelled`.
+- Exceptions: `AnchorNotActiveForTransition`, `IncompatiblePlanTransition`, `InsufficientCapacityForTransition`, `InvalidTransitionScheduledDate`, `NoOpPlanTransition`, `PlanCategoryExclusivityViolation`, `TransitionAlreadyResolved`. All messages routed through `__()` and translated.
+
+### Category exclusivity
+
+- New `entitlement_plan_categories.allows_multiple_active_plans` column (boolean, default `true`).
+- When `false`, a subscriber can hold at most one active anchor in that category. Enforced by both `assignPlan` and `changePlan`.
+
+### Filament v5
+
+- New `SubscriptionPlansCluster`: Plans and Plan Categories now live under a single "Subscription Plans" sidebar entry with top-tab sub-navigation.
+- `LicensesRelationManager`:
+  - Replaced the legacy "Edit plan" action with a unified **"Change plan"** modal: plan select (defaults to the current plan), apply-mode radio (`End of period` default / `Immediate` / `At a specific date`) with an inline date picker, and per-flexible-item quantity overrides pre-filled with the current group's slot totals.
+  - **"Cancel pending change"** action and warning badge on anchors with a scheduled transition.
+  - Anchors ordered by nearest expiration first; perpetuals next; expired at the bottom.
+  - Expiration badge colored: green for perpetual, warning for active, danger for expired.
+  - "Recurring" badge hidden on expired licenses.
+  - Domain exceptions surface as translated "Operation not permitted" danger notifications instead of bubbling 500s.
+- `PlanCategory` form gains the **"Allow multiple active plans"** toggle with explanatory helper text.
+
+### Internationalization
+
+- All new UI strings and exception messages translated in English, Italian, Chinese and Russian. `TranslationsTest` enforces locale key parity.
+
+### Testing & quality
+
+- Filament smoke tests (plugin registration, cluster wiring, resources, translations parity).
+- Pest 4 suite: 70 tests / 175+ assertions covering the new transition flows and validations.
+- Bumped requirement: `filament/filament` now requires `^5.0` (drops the optional v4 path).
+- `tests/TestCase.php` only registers Filament service providers when the corresponding classes are installed, keeping `prefer-lowest` CI green.
+- PHPStan model property docblocks updated; replaced the deprecated `VerifyCsrfToken` middleware with `PreventRequestForgery` in the workbench panel.
+
 ## 1.0.0 - 2026-05-20
 
 First stable release. Full subscription plan and license management for Laravel applications, with project-specific entitlement types and an optional Filament v5 admin UI.
