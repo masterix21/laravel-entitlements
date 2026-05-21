@@ -177,6 +177,22 @@ final class Entitlements
         return $transition;
     }
 
+    public function applyDueTransitions(): int
+    {
+        $applied = 0;
+
+        PlanTransition::due()->orderBy('scheduled_at')->get()->each(function (PlanTransition $transition) use (&$applied): void {
+            try {
+                $this->applyTransition($transition);
+                $applied++;
+            } catch (\Throwable) {
+                // failure already recorded by applyTransition
+            }
+        });
+
+        return $applied;
+    }
+
     private function applyTransition(PlanTransition $transition): void
     {
         /** @var License $anchor */
@@ -187,7 +203,7 @@ final class Entitlements
 
         try {
             DB::transaction(function () use ($transition, $anchor, $newPlan, $overrides): void {
-                $this->validateTransition($anchor, $newPlan, $overrides, PlanTransitionMode::Immediate);
+                $this->validateTransition($anchor, $newPlan, $overrides, PlanTransitionMode::Immediate, skipAnchorActiveCheck: $transition->apply_mode === PlanTransitionMode::EndOfPeriod);
 
                 $subscriber = $anchor->subscriber;
                 $transitionAt = now();
@@ -269,12 +285,13 @@ final class Entitlements
         Plan $newPlan,
         array $quantityOverrides,
         PlanTransitionMode $mode,
+        bool $skipAnchorActiveCheck = false,
     ): void {
         if ($anchor->parent_id !== null) {
             throw AnchorNotActiveForTransition::notAnchor($anchor->id);
         }
 
-        if ($anchor->ends_at !== null && $anchor->ends_at->lessThanOrEqualTo(now())) {
+        if (! $skipAnchorActiveCheck && $anchor->ends_at !== null && $anchor->ends_at->lessThanOrEqualTo(now())) {
             throw AnchorNotActiveForTransition::expired($anchor->id);
         }
 

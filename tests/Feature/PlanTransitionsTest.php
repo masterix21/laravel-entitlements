@@ -261,3 +261,38 @@ it('schedules an end-of-period transition without altering the current group', f
     Event::assertDispatched(PlanTransitionScheduled::class);
     Event::assertNotDispatched(PlanTransitionApplied::class);
 });
+
+use LucaLongo\LaravelEntitlements\Commands\ApplyDuePlanTransitionsCommand;
+
+it('materializes due transitions via applyDueTransitions', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $endsAt = $anchor->ends_at;
+
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $transition = Entitlements::changePlan($anchor, $target, PlanTransitionMode::EndOfPeriod);
+
+    $this->travelTo($endsAt->copy()->addSecond());
+
+    $applied = Entitlements::applyDueTransitions();
+
+    expect($applied)->toBe(1);
+    expect($transition->fresh()->status)->toBe(PlanTransitionStatus::Applied);
+    expect($anchor->fresh()->ends_at->lessThanOrEqualTo(now()))->toBeTrue();
+});
+
+it('runs entitlements:apply-transitions command', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $endsAt = $anchor->ends_at;
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $transition = Entitlements::changePlan($anchor, $target, PlanTransitionMode::EndOfPeriod);
+
+    $this->travelTo($endsAt->copy()->addSecond());
+
+    $this->artisan('entitlements:apply-transitions')->assertSuccessful();
+
+    expect($transition->fresh()->status)->toBe(PlanTransitionStatus::Applied);
+});
