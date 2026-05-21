@@ -65,7 +65,8 @@ final class LicensesRelationManager extends RelationManager
                             }),
                         Badge::make('is_recurring')
                             ->label(fn (License $record): string => $record->plan->is_recurring ? __('Recurring') : __('Fixed-term'))
-                            ->color(fn (License $record): string => $record->plan->is_recurring ? 'success' : 'gray'),
+                            ->color(fn (License $record): string => $record->plan->is_recurring ? 'success' : 'gray')
+                            ->visible(fn (License $record): bool => $record->ends_at === null || $record->ends_at->isFuture()),
                         Badge::make('expired')
                             ->label(__('Expired'))
                             ->color('danger')
