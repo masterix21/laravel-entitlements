@@ -32,9 +32,10 @@ it('lists license usage statuses', function (): void {
 
 it('exposes PlanTransitionMode cases', function (): void {
     expect(PlanTransitionMode::cases())
-        ->toHaveCount(2)
+        ->toHaveCount(3)
         ->and(PlanTransitionMode::Immediate->value)->toBe('immediate')
-        ->and(PlanTransitionMode::EndOfPeriod->value)->toBe('end_of_period');
+        ->and(PlanTransitionMode::EndOfPeriod->value)->toBe('end_of_period')
+        ->and(PlanTransitionMode::AtDate->value)->toBe('at_date');
 });
 
 it('exposes PlanTransitionStatus cases', function (): void {

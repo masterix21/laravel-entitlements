@@ -28,9 +28,9 @@ use LucaLongo\LaravelEntitlements\Enums\BillingPeriod;
 use LucaLongo\LaravelEntitlements\Enums\LicenseUsageStatus;
 use LucaLongo\LaravelEntitlements\Enums\PlanTransitionMode;
 use LucaLongo\LaravelEntitlements\Exceptions\AnchorNotActiveForTransition;
-use LucaLongo\LaravelEntitlements\Exceptions\EndOfPeriodTransitionRequiresEndsAt;
 use LucaLongo\LaravelEntitlements\Exceptions\IncompatiblePlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\InsufficientCapacityForTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\InvalidTransitionScheduledDate;
 use LucaLongo\LaravelEntitlements\Exceptions\NoOpPlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\PlanCategoryExclusivityViolation;
 use LucaLongo\LaravelEntitlements\Exceptions\TransitionAlreadyResolved;
@@ -249,9 +249,19 @@ final class LicensesRelationManager extends RelationManager
                                     ->options([
                                         PlanTransitionMode::EndOfPeriod->value => __('End of period'),
                                         PlanTransitionMode::Immediate->value => __('Immediate'),
+                                        PlanTransitionMode::AtDate->value => __('At a specific date'),
                                     ])
                                     ->default(PlanTransitionMode::EndOfPeriod->value)
                                     ->required()
+                                    ->live()
+                                    ->columnSpanFull(),
+
+                                DatePicker::make('scheduled_at')
+                                    ->label(__('Scheduled date'))
+                                    ->native(false)
+                                    ->minDate(now()->addDay())
+                                    ->required(fn (Get $get): bool => $get('apply_mode') === PlanTransitionMode::AtDate->value)
+                                    ->visible(fn (Get $get): bool => $get('apply_mode') === PlanTransitionMode::AtDate->value)
                                     ->columnSpanFull(),
 
                                 Group::make()
@@ -268,15 +278,19 @@ final class LicensesRelationManager extends RelationManager
                             ->mapWithKeys(fn ($q, $id): array => [(int) $id => (int) $q])
                             ->all();
 
+                        $scheduledAt = ! empty($data['scheduled_at'])
+                            ? CarbonImmutable::parse($data['scheduled_at'])
+                            : null;
+
                         try {
-                            Entitlements::changePlan($record, $newPlan, $mode, $overrides);
+                            Entitlements::changePlan($record, $newPlan, $mode, $overrides, $scheduledAt);
                         } catch (
                             PlanCategoryExclusivityViolation
                             |IncompatiblePlanTransition
                             |InsufficientCapacityForTransition
                             |AnchorNotActiveForTransition
-                            |EndOfPeriodTransitionRequiresEndsAt
-                            |NoOpPlanTransition $e
+                            |NoOpPlanTransition
+                            |InvalidTransitionScheduledDate $e
                         ) {
                             self::notifyDomainError($e);
 

@@ -19,9 +19,9 @@ use LucaLongo\LaravelEntitlements\Events\PlanTransitionCancelled;
 use LucaLongo\LaravelEntitlements\Events\PlanTransitionFailed;
 use LucaLongo\LaravelEntitlements\Events\PlanTransitionScheduled;
 use LucaLongo\LaravelEntitlements\Exceptions\AnchorNotActiveForTransition;
-use LucaLongo\LaravelEntitlements\Exceptions\EndOfPeriodTransitionRequiresEndsAt;
 use LucaLongo\LaravelEntitlements\Exceptions\IncompatiblePlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\InsufficientCapacityForTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\InvalidTransitionScheduledDate;
 use LucaLongo\LaravelEntitlements\Exceptions\NoOpPlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\PlanCategoryExclusivityViolation;
 use LucaLongo\LaravelEntitlements\Exceptions\TransitionAlreadyResolved;
@@ -159,19 +159,18 @@ final class Entitlements
         Plan $newPlan,
         PlanTransitionMode $mode,
         array $quantityOverrides = [],
+        ?CarbonInterface $scheduledAt = null,
     ): PlanTransition {
         $this->validateTransition($anchor, $newPlan, $quantityOverrides, $mode);
 
-        $scheduledAt = $mode === PlanTransitionMode::Immediate
-            ? now()
-            : $anchor->ends_at;
+        $effectiveScheduledAt = $this->resolveScheduledAt($anchor, $mode, $scheduledAt);
 
         $transition = PlanTransition::create([
             'anchor_license_id' => $anchor->id,
             'target_plan_id' => $newPlan->id,
             'apply_mode' => $mode->value,
             'status' => PlanTransitionStatus::Pending->value,
-            'scheduled_at' => $scheduledAt,
+            'scheduled_at' => $effectiveScheduledAt,
             'quantity_overrides' => $quantityOverrides ?: null,
         ]);
 
@@ -184,6 +183,31 @@ final class Entitlements
         PlanTransitionScheduled::dispatch($transition);
 
         return $transition;
+    }
+
+    private function resolveScheduledAt(
+        License $anchor,
+        PlanTransitionMode $mode,
+        ?CarbonInterface $scheduledAt,
+    ): CarbonInterface {
+        return match ($mode) {
+            PlanTransitionMode::Immediate => now(),
+            PlanTransitionMode::EndOfPeriod => $anchor->ends_at ?? $anchor->next_billing_at,
+            PlanTransitionMode::AtDate => $this->ensureFutureDate($scheduledAt),
+        };
+    }
+
+    private function ensureFutureDate(?CarbonInterface $scheduledAt): CarbonInterface
+    {
+        if ($scheduledAt === null) {
+            throw InvalidTransitionScheduledDate::missing();
+        }
+
+        if ($scheduledAt->lessThanOrEqualTo(now())) {
+            throw InvalidTransitionScheduledDate::notInFuture();
+        }
+
+        return $scheduledAt;
     }
 
     public function cancelTransition(PlanTransition $transition): void
@@ -312,10 +336,6 @@ final class Entitlements
 
         if (! $skipAnchorActiveCheck && $anchor->ends_at !== null && $anchor->ends_at->lessThanOrEqualTo(now())) {
             throw AnchorNotActiveForTransition::expired($anchor->id);
-        }
-
-        if ($mode === PlanTransitionMode::EndOfPeriod && $anchor->ends_at === null) {
-            throw EndOfPeriodTransitionRequiresEndsAt::make();
         }
 
         $newPlan->loadMissing(['items', 'category']);

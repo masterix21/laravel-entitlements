@@ -8,4 +8,5 @@ enum PlanTransitionMode: string
 {
     case Immediate = 'immediate';
     case EndOfPeriod = 'end_of_period';
+    case AtDate = 'at_date';
 }

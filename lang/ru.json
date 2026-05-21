@@ -58,6 +58,9 @@
     "This license is part of a plan group and cannot be changed directly.": "Эта лицензия входит в группу плана и не может быть изменена напрямую.",
     "This plan is no longer active and cannot be changed.": "Этот план больше не активен и не может быть изменён.",
     "This plan change has already been processed and cannot be modified.": "Это изменение плана уже обработано и не может быть изменено.",
-    "A plan without an end date cannot be changed at the end of the period. Use the immediate option instead.": "План без даты окончания нельзя изменить в конце периода. Используйте вариант «Немедленно».",
-    "The selected plan and quantities are identical to the current ones. Change at least one value.": "Выбранный план и количества совпадают с текущими. Измените хотя бы одно значение."
+    "The selected plan and quantities are identical to the current ones. Change at least one value.": "Выбранный план и количества совпадают с текущими. Измените хотя бы одно значение.",
+    "At a specific date": "В указанную дату",
+    "Scheduled date": "Запланированная дата",
+    "A scheduled date is required for this plan change.": "Для этого изменения плана требуется запланированная дата.",
+    "The scheduled date must be in the future.": "Запланированная дата должна быть в будущем."
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LucaLongo\LaravelEntitlements\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -97,6 +98,30 @@ final class License extends Model
     public function remaining(): Attribute
     {
         return Attribute::get(fn (): int => max(0, $this->slot_total - $this->slot_used));
+    }
+
+    public function nextBillingAt(): Attribute
+    {
+        return Attribute::get(function (): ?CarbonInterface {
+            if ($this->starts_at === null) {
+                return null;
+            }
+
+            $billingPeriod = $this->plan?->billing_period;
+
+            if ($billingPeriod === null) {
+                return $this->ends_at;
+            }
+
+            $now = now();
+            $cursor = $this->starts_at->copy();
+
+            while ($cursor->lessThanOrEqualTo($now)) {
+                $cursor = $billingPeriod->advance($cursor);
+            }
+
+            return $cursor;
+        });
     }
 
     public function isValid(): bool

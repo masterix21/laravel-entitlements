@@ -58,6 +58,9 @@
     "This license is part of a plan group and cannot be changed directly.": "Questa licenza fa parte di un gruppo di piano e non può essere modificata direttamente.",
     "This plan is no longer active and cannot be changed.": "Questo piano non è più attivo e non può essere modificato.",
     "This plan change has already been processed and cannot be modified.": "Questo cambio piano è già stato elaborato e non può essere modificato.",
-    "A plan without an end date cannot be changed at the end of the period. Use the immediate option instead.": "Un piano senza data di scadenza non può essere cambiato a fine periodo. Usa invece l’opzione immediata.",
-    "The selected plan and quantities are identical to the current ones. Change at least one value.": "Il piano e le quantità selezionate sono identici a quelli attuali. Modifica almeno un valore."
+    "The selected plan and quantities are identical to the current ones. Change at least one value.": "Il piano e le quantità selezionate sono identici a quelli attuali. Modifica almeno un valore.",
+    "At a specific date": "In una data specifica",
+    "Scheduled date": "Data pianificata",
+    "A scheduled date is required for this plan change.": "Per questo cambio piano è necessaria una data pianificata.",
+    "The scheduled date must be in the future.": "La data pianificata deve essere nel futuro."
 }

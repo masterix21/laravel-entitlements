@@ -94,9 +94,10 @@ it('scopes pending and due transitions', function (): void {
 
 use LucaLongo\LaravelEntitlements\Enums\BillingPeriod;
 use LucaLongo\LaravelEntitlements\Exceptions\AnchorNotActiveForTransition;
-use LucaLongo\LaravelEntitlements\Exceptions\EndOfPeriodTransitionRequiresEndsAt;
 use LucaLongo\LaravelEntitlements\Exceptions\IncompatiblePlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\InsufficientCapacityForTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\InvalidTransitionScheduledDate;
+use LucaLongo\LaravelEntitlements\Exceptions\NoOpPlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\PlanCategoryExclusivityViolation;
 use LucaLongo\LaravelEntitlements\Facades\Entitlements;
 use LucaLongo\LaravelEntitlements\Models\PlanItem;
@@ -150,19 +151,54 @@ it('rejects transition when anchor has already expired', function (): void {
     Entitlements::changePlan($anchor->fresh(), $target, PlanTransitionMode::Immediate);
 })->throws(AnchorNotActiveForTransition::class);
 
-it('rejects end-of-period when anchor has no ends_at', function (): void {
+it('schedules end-of-period on a perpetual plan using the next billing date', function (): void {
     $subscriber = Subscriber::create(['name' => 'acme']);
     $plan = Plan::factory()->create([
         'billing_period' => BillingPeriod::Monthly->value,
         'is_recurring' => true,
     ]);
     PlanItem::factory()->for($plan)->create(['type' => TestType::Single->value, 'quantity' => 1]);
-    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $startsAt = now()->startOfDay();
+    $anchor = Entitlements::assignPlan($subscriber, $plan, $startsAt)->first();
 
     $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
 
-    Entitlements::changePlan($anchor, $target, PlanTransitionMode::EndOfPeriod);
-})->throws(EndOfPeriodTransitionRequiresEndsAt::class);
+    $transition = Entitlements::changePlan($anchor, $target, PlanTransitionMode::EndOfPeriod);
+
+    expect($transition->scheduled_at->equalTo($startsAt->copy()->addMonthNoOverflow()))->toBeTrue();
+});
+
+it('accepts at-date mode with a future scheduled date', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $when = now()->addDays(10)->startOfSecond();
+
+    $transition = Entitlements::changePlan($anchor, $target, PlanTransitionMode::AtDate, [], $when);
+
+    expect($transition->scheduled_at->timestamp)->toBe($when->timestamp)
+        ->and($transition->status->value)->toBe('pending');
+});
+
+it('rejects at-date mode when no date is provided', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+
+    Entitlements::changePlan($anchor, $target, PlanTransitionMode::AtDate);
+})->throws(InvalidTransitionScheduledDate::class);
+
+it('rejects at-date mode when date is in the past', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+
+    Entitlements::changePlan($anchor, $target, PlanTransitionMode::AtDate, [], now()->subDay());
+})->throws(InvalidTransitionScheduledDate::class);
 
 it('rejects transition when an open usage type is missing in the new plan', function (): void {
     $subscriber = Subscriber::create(['name' => 'acme']);
@@ -378,7 +414,6 @@ it('rejects cancellation of a non-pending transition', function (): void {
 })->throws(TransitionAlreadyResolved::class);
 
 use LucaLongo\LaravelEntitlements\Events\PlanTransitionFailed;
-use LucaLongo\LaravelEntitlements\Exceptions\NoOpPlanTransition;
 
 it('marks transition as failed when revalidation in apply phase fails', function (): void {
     Event::fake([PlanTransitionFailed::class]);
