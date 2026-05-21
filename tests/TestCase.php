@@ -4,11 +4,25 @@ declare(strict_types=1);
 
 namespace LucaLongo\LaravelEntitlements\Tests;
 
+use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
+use BladeUI\Icons\BladeIconsServiceProvider;
+use Filament\Actions\ActionsServiceProvider;
+use Filament\FilamentServiceProvider;
+use Filament\Forms\FormsServiceProvider;
+use Filament\Infolists\InfolistsServiceProvider;
+use Filament\Notifications\NotificationsServiceProvider;
+use Filament\Schemas\SchemasServiceProvider;
+use Filament\Support\SupportServiceProvider;
+use Filament\Tables\TablesServiceProvider;
+use Filament\Widgets\WidgetsServiceProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\File;
+use Livewire\LivewireServiceProvider;
 use LucaLongo\LaravelEntitlements\LaravelEntitlementsServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
+use RyanChandler\BladeCaptureDirective\BladeCaptureDirectiveServiceProvider;
 use Workbench\App\Enums\TestType;
+use Workbench\App\Providers\Filament\AdminPanelProvider;
 
 class TestCase extends Orchestra
 {
@@ -24,21 +38,21 @@ class TestCase extends Orchestra
     protected function getPackageProviders($app)
     {
         return [
-            \Filament\FilamentServiceProvider::class,
-            \Filament\Actions\ActionsServiceProvider::class,
-            \Filament\Forms\FormsServiceProvider::class,
-            \Filament\Infolists\InfolistsServiceProvider::class,
-            \Filament\Notifications\NotificationsServiceProvider::class,
-            \Filament\Schemas\SchemasServiceProvider::class,
-            \Filament\Support\SupportServiceProvider::class,
-            \Filament\Tables\TablesServiceProvider::class,
-            \Filament\Widgets\WidgetsServiceProvider::class,
-            \Livewire\LivewireServiceProvider::class,
-            \BladeUI\Icons\BladeIconsServiceProvider::class,
-            \BladeUI\Heroicons\BladeHeroiconsServiceProvider::class,
-            \RyanChandler\BladeCaptureDirective\BladeCaptureDirectiveServiceProvider::class,
+            FilamentServiceProvider::class,
+            ActionsServiceProvider::class,
+            FormsServiceProvider::class,
+            InfolistsServiceProvider::class,
+            NotificationsServiceProvider::class,
+            SchemasServiceProvider::class,
+            SupportServiceProvider::class,
+            TablesServiceProvider::class,
+            WidgetsServiceProvider::class,
+            LivewireServiceProvider::class,
+            BladeIconsServiceProvider::class,
+            BladeHeroiconsServiceProvider::class,
+            BladeCaptureDirectiveServiceProvider::class,
             LaravelEntitlementsServiceProvider::class,
-            \Workbench\App\Providers\Filament\AdminPanelProvider::class,
+            AdminPanelProvider::class,
         ];
     }
 
@@ -56,7 +70,11 @@ class TestCase extends Orchestra
             (include $migration->getRealPath())->up();
         }
 
-        foreach (File::allFiles(__DIR__.'/../database/migrations') as $migration) {
+        $migrations = collect(File::allFiles(__DIR__.'/../database/migrations'))
+            ->sortBy(fn ($m) => (str_starts_with($m->getFilename(), 'create_') ? '0_' : '1_').$m->getFilename())
+            ->values();
+
+        foreach ($migrations as $migration) {
             (include $migration->getRealPath())->up();
         }
     }
