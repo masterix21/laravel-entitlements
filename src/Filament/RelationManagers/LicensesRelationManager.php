@@ -79,10 +79,20 @@ final class LicensesRelationManager extends RelationManager
                         ->map(fn (License $license): string => self::resourceUsageLine($license))
                         ->all()),
 
-                TextColumn::make('validity')
+                BadgeableColumn::make('validity')
                     ->label(__('Validity'))
                     ->state(fn (License $record): string => $record->starts_at->translatedFormat('M j, Y'))
-                    ->description(fn (License $record): string => $record->ends_at?->translatedFormat('M j, Y') ?? __('Perpetual')),
+                    ->suffixBadges([
+                        Badge::make('expiration')
+                            ->label(fn (License $record): string => $record->ends_at === null
+                                ? __('Perpetual')
+                                : $record->ends_at->translatedFormat('M j, Y'))
+                            ->color(fn (License $record): string => match (true) {
+                                $record->ends_at === null => 'success',
+                                $record->ends_at->isPast() => 'danger',
+                                default => 'warning',
+                            }),
+                    ]),
 
                 TextColumn::make('pending_transition')
                     ->label('')
