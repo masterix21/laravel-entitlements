@@ -50,5 +50,6 @@
     "Cancel pending change": "Annulla cambio pianificato",
     "Expired": "Scaduta",
     "Allow multiple active plans": "Consenti più piani attivi",
-    "When disabled, a subscriber can have at most one active plan in this category.": "Se disattivato, un abbonato può avere al massimo un piano attivo in questa categoria."
+    "When disabled, a subscriber can have at most one active plan in this category.": "Se disattivato, un abbonato può avere al massimo un piano attivo in questa categoria.",
+    "Operation not permitted": "Operazione non consentita"
 }

@@ -50,5 +50,6 @@
     "Cancel pending change": "Cancel pending change",
     "Expired": "Expired",
     "Allow multiple active plans": "Allow multiple active plans",
-    "When disabled, a subscriber can have at most one active plan in this category.": "When disabled, a subscriber can have at most one active plan in this category."
+    "When disabled, a subscriber can have at most one active plan in this category.": "When disabled, a subscriber can have at most one active plan in this category.",
+    "Operation not permitted": "Operation not permitted"
 }

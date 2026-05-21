@@ -50,5 +50,6 @@
     "Cancel pending change": "取消计划中的更改",
     "Expired": "已过期",
     "Allow multiple active plans": "允许多个有效套餐",
-    "When disabled, a subscriber can have at most one active plan in this category.": "禁用时,订阅者在此类别中最多只能拥有一个有效套餐。"
+    "When disabled, a subscriber can have at most one active plan in this category.": "禁用时,订阅者在此类别中最多只能拥有一个有效套餐。",
+    "Operation not permitted": "操作不允许"
 }

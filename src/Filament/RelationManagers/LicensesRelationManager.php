@@ -27,6 +27,12 @@ use Illuminate\Support\Collection;
 use LucaLongo\LaravelEntitlements\Enums\BillingPeriod;
 use LucaLongo\LaravelEntitlements\Enums\LicenseUsageStatus;
 use LucaLongo\LaravelEntitlements\Enums\PlanTransitionMode;
+use LucaLongo\LaravelEntitlements\Exceptions\AnchorNotActiveForTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\EndOfPeriodTransitionRequiresEndsAt;
+use LucaLongo\LaravelEntitlements\Exceptions\IncompatiblePlanTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\InsufficientCapacityForTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\PlanCategoryExclusivityViolation;
+use LucaLongo\LaravelEntitlements\Exceptions\TransitionAlreadyResolved;
 use LucaLongo\LaravelEntitlements\Facades\Entitlements;
 use LucaLongo\LaravelEntitlements\Models\License;
 use LucaLongo\LaravelEntitlements\Models\Plan;
@@ -173,12 +179,18 @@ final class LicensesRelationManager extends RelationManager
                             ->mapWithKeys(fn ($q, $id): array => [(int) $id => (int) $q])
                             ->all();
 
-                        $licenses = Entitlements::assignPlan(
-                            $this->getOwnerRecord(),
-                            $plan,
-                            CarbonImmutable::parse($data['starts_at']),
-                            $overrides,
-                        );
+                        try {
+                            $licenses = Entitlements::assignPlan(
+                                $this->getOwnerRecord(),
+                                $plan,
+                                CarbonImmutable::parse($data['starts_at']),
+                                $overrides,
+                            );
+                        } catch (PlanCategoryExclusivityViolation $e) {
+                            self::notifyDomainError($e);
+
+                            return;
+                        }
 
                         if (! empty($data['ends_at'])) {
                             $endsAt = CarbonImmutable::parse($data['ends_at']);
@@ -254,7 +266,19 @@ final class LicensesRelationManager extends RelationManager
                             ->mapWithKeys(fn ($q, $id): array => [(int) $id => (int) $q])
                             ->all();
 
-                        Entitlements::changePlan($record, $newPlan, $mode, $overrides);
+                        try {
+                            Entitlements::changePlan($record, $newPlan, $mode, $overrides);
+                        } catch (
+                            PlanCategoryExclusivityViolation
+                            |IncompatiblePlanTransition
+                            |InsufficientCapacityForTransition
+                            |AnchorNotActiveForTransition
+                            |EndOfPeriodTransitionRequiresEndsAt $e
+                        ) {
+                            self::notifyDomainError($e);
+
+                            return;
+                        }
 
                         Notification::make()
                             ->title(__('Change plan'))
@@ -276,7 +300,13 @@ final class LicensesRelationManager extends RelationManager
                             return;
                         }
 
-                        Entitlements::cancelTransition($pending);
+                        try {
+                            Entitlements::cancelTransition($pending);
+                        } catch (TransitionAlreadyResolved $e) {
+                            self::notifyDomainError($e);
+
+                            return;
+                        }
 
                         Notification::make()
                             ->title(__('Cancel pending change'))
@@ -425,5 +455,14 @@ final class LicensesRelationManager extends RelationManager
         }
 
         return method_exists($type, 'getLabel') ? $type->getLabel() : (isset($type->name) ? __($type->name) : (string) $type);
+    }
+
+    private static function notifyDomainError(\Throwable $e): void
+    {
+        Notification::make()
+            ->title(__('Operation not permitted'))
+            ->body($e->getMessage())
+            ->danger()
+            ->send();
     }
 }
