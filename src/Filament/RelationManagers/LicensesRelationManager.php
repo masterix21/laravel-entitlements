@@ -254,7 +254,7 @@ final class LicensesRelationManager extends RelationManager
                                     ->default(PlanTransitionMode::EndOfPeriod->value)
                                     ->required()
                                     ->live()
-                                    ->columnSpanFull(),
+                                    ->columnSpan(1),
 
                                 DatePicker::make('scheduled_at')
                                     ->label(__('Scheduled date'))
@@ -262,7 +262,8 @@ final class LicensesRelationManager extends RelationManager
                                     ->minDate(now()->addDay())
                                     ->required(fn (Get $get): bool => $get('apply_mode') === PlanTransitionMode::AtDate->value)
                                     ->visible(fn (Get $get): bool => $get('apply_mode') === PlanTransitionMode::AtDate->value)
-                                    ->columnSpanFull(),
+                                    ->extraAttributes(['class' => 'self-end'])
+                                    ->columnSpan(1),
 
                                 Group::make()
                                     ->columnSpanFull()
