@@ -37,7 +37,7 @@ class TestCase extends Orchestra
 
     protected function getPackageProviders($app)
     {
-        return [
+        $optional = [
             FilamentServiceProvider::class,
             ActionsServiceProvider::class,
             FormsServiceProvider::class,
@@ -51,9 +51,13 @@ class TestCase extends Orchestra
             BladeIconsServiceProvider::class,
             BladeHeroiconsServiceProvider::class,
             BladeCaptureDirectiveServiceProvider::class,
-            LaravelEntitlementsServiceProvider::class,
             AdminPanelProvider::class,
         ];
+
+        $providers = array_values(array_filter($optional, fn (string $class): bool => class_exists($class)));
+        $providers[] = LaravelEntitlementsServiceProvider::class;
+
+        return $providers;
     }
 
     public function getEnvironmentSetUp($app)
