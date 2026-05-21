@@ -14,6 +14,9 @@ use LucaLongo\LaravelEntitlements\Enums\PlanTransitionMode;
 use LucaLongo\LaravelEntitlements\Enums\PlanTransitionStatus;
 use LucaLongo\LaravelEntitlements\Events\LicenseReconciled;
 use LucaLongo\LaravelEntitlements\Events\PlanAssigned;
+use LucaLongo\LaravelEntitlements\Events\PlanTransitionApplied;
+use LucaLongo\LaravelEntitlements\Events\PlanTransitionFailed;
+use LucaLongo\LaravelEntitlements\Events\PlanTransitionScheduled;
 use LucaLongo\LaravelEntitlements\Exceptions\AnchorNotActiveForTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\EndOfPeriodTransitionRequiresEndsAt;
 use LucaLongo\LaravelEntitlements\Exceptions\IncompatiblePlanTransition;
@@ -154,7 +157,7 @@ final class Entitlements
             ? now()
             : $anchor->ends_at;
 
-        return PlanTransition::create([
+        $transition = PlanTransition::create([
             'anchor_license_id' => $anchor->id,
             'target_plan_id' => $newPlan->id,
             'apply_mode' => $mode->value,
@@ -162,6 +165,100 @@ final class Entitlements
             'scheduled_at' => $scheduledAt,
             'quantity_overrides' => $quantityOverrides ?: null,
         ]);
+
+        if ($mode === PlanTransitionMode::Immediate) {
+            $this->applyTransition($transition);
+
+            return $transition->fresh();
+        }
+
+        PlanTransitionScheduled::dispatch($transition);
+
+        return $transition;
+    }
+
+    private function applyTransition(PlanTransition $transition): void
+    {
+        /** @var License $anchor */
+        $anchor = $transition->anchorLicense()->firstOrFail();
+        /** @var Plan $newPlan */
+        $newPlan = $transition->targetPlan()->with('items')->firstOrFail();
+        $overrides = $transition->quantity_overrides ?? [];
+
+        try {
+            DB::transaction(function () use ($transition, $anchor, $newPlan, $overrides): void {
+                $this->validateTransition($anchor, $newPlan, $overrides, PlanTransitionMode::Immediate);
+
+                $subscriber = $anchor->subscriber;
+                $transitionAt = now();
+                $endsAt = $newPlan->is_recurring ? null : $newPlan->billing_period->advance($transitionAt);
+
+                $newAnchorId = null;
+                $newLicensesByType = [];
+                foreach ($newPlan->items as $item) {
+                    $license = $this->createLicenseFromItem(
+                        $subscriber,
+                        $newPlan,
+                        $item,
+                        $transitionAt,
+                        $endsAt,
+                        $newAnchorId,
+                        $overrides,
+                    );
+                    $newAnchorId ??= $license->id;
+                    $newLicensesByType[$item->type->value] = $license;
+                }
+
+                $oldGroupIds = License::query()
+                    ->where('id', $anchor->id)
+                    ->orWhere('parent_id', $anchor->id)
+                    ->pluck('id');
+
+                $usages = LicenseUsage::query()
+                    ->whereIn('license_id', $oldGroupIds)
+                    ->open()
+                    ->get();
+
+                foreach ($usages as $usage) {
+                    /** @var License $oldLicense */
+                    $oldLicense = $usage->license;
+                    $target = $newLicensesByType[$oldLicense->type->value] ?? null;
+                    if ($target === null) {
+                        throw IncompatiblePlanTransition::forType((string) $oldLicense->type->value);
+                    }
+                    $usage->update(['license_id' => $target->id]);
+                }
+
+                License::query()
+                    ->whereIn('id', $oldGroupIds)
+                    ->update(['ends_at' => $transitionAt]);
+
+                foreach ($newLicensesByType as $license) {
+                    $this->reconcile($license->fresh());
+                }
+
+                $transition->update([
+                    'status' => PlanTransitionStatus::Applied->value,
+                    'applied_at' => $transitionAt,
+                    'new_anchor_license_id' => $newAnchorId,
+                ]);
+            });
+
+            /** @var PlanTransition $fresh */
+            $fresh = $transition->fresh();
+            /** @var License $newAnchor */
+            $newAnchor = $fresh->newAnchorLicense;
+            /** @var License $oldAnchorFresh */
+            $oldAnchorFresh = $anchor->fresh();
+            PlanTransitionApplied::dispatch($fresh, $oldAnchorFresh, $newAnchor);
+        } catch (\Throwable $e) {
+            $transition->update([
+                'status' => PlanTransitionStatus::Failed->value,
+                'failure_reason' => $e->getMessage(),
+            ]);
+            PlanTransitionFailed::dispatch($transition->fresh(), $e);
+            throw $e;
+        }
     }
 
     /**

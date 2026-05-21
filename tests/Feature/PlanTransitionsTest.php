@@ -202,3 +202,62 @@ it('rejects transition that would violate category exclusivity', function (): vo
 
     Entitlements::changePlan($anchorA, $planC, PlanTransitionMode::Immediate);
 })->throws(PlanCategoryExclusivityViolation::class);
+
+use Illuminate\Support\Facades\Event;
+use LucaLongo\LaravelEntitlements\Events\PlanTransitionApplied;
+use LucaLongo\LaravelEntitlements\Events\PlanTransitionScheduled;
+
+it('applies an immediate transition: closes old group, creates new, migrates usages', function (): void {
+    Event::fake([PlanTransitionApplied::class]);
+
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([
+        ['type' => TestType::Single->value, 'quantity' => 1],
+        ['type' => TestType::Pooled->value, 'quantity' => 100],
+    ]);
+    $oldAnchor = Entitlements::assignPlan($subscriber, $plan, now())->firstWhere('parent_id', null);
+    $usage = Entitlements::consume($subscriber, TestType::Pooled, $subscriber, 5);
+
+    $target = makePlan([
+        ['type' => TestType::Single->value, 'quantity' => 2],
+        ['type' => TestType::Pooled->value, 'quantity' => 200],
+    ]);
+
+    $transition = Entitlements::changePlan($oldAnchor, $target, PlanTransitionMode::Immediate);
+
+    expect($transition->fresh()->status)->toBe(PlanTransitionStatus::Applied);
+    expect($transition->fresh()->new_anchor_license_id)->not->toBeNull();
+
+    $newAnchor = $transition->fresh()->newAnchorLicense;
+    expect($newAnchor->plan_id)->toBe($target->id)
+        ->and($newAnchor->parent_id)->toBeNull();
+
+    expect($oldAnchor->fresh()->ends_at)->not->toBeNull();
+    expect($oldAnchor->fresh()->ends_at->lessThanOrEqualTo(now()))->toBeTrue();
+
+    expect($usage->fresh()->license->plan_id)->toBe($target->id);
+    expect($usage->fresh()->license->type->value)->toBe(TestType::Pooled->value);
+
+    Event::assertDispatched(PlanTransitionApplied::class);
+});
+
+it('schedules an end-of-period transition without altering the current group', function (): void {
+    Event::fake([PlanTransitionScheduled::class, PlanTransitionApplied::class]);
+
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $endsAt = $anchor->ends_at;
+
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+
+    $transition = Entitlements::changePlan($anchor, $target, PlanTransitionMode::EndOfPeriod);
+
+    expect($transition->status)->toBe(PlanTransitionStatus::Pending)
+        ->and($transition->scheduled_at->equalTo($endsAt))->toBeTrue();
+
+    expect($anchor->fresh()->ends_at->equalTo($endsAt))->toBeTrue();
+
+    Event::assertDispatched(PlanTransitionScheduled::class);
+    Event::assertNotDispatched(PlanTransitionApplied::class);
+});
