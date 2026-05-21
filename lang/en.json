@@ -41,5 +41,11 @@
     "Slot released": "Slot released",
     "Start Date": "Start Date",
     "Empty means the license never expires.": "Empty means the license never expires.",
-    ":type quantity": ":type quantity"
+    ":type quantity": ":type quantity",
+    "Change plan": "Change plan",
+    "Apply mode": "Apply mode",
+    "End of period": "End of period",
+    "Immediate": "Immediate",
+    "Pending plan change": "Pending change to :plan on :date",
+    "Cancel pending change": "Cancel pending change"
 }

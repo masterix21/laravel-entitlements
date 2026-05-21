@@ -41,5 +41,11 @@
     "Slot released": "Slot rilasciato",
     "Start Date": "Data di inizio",
     "Empty means the license never expires.": "Vuoto significa che la licenza non scade mai.",
-    ":type quantity": "Quantità :type"
+    ":type quantity": "Quantità :type",
+    "Change plan": "Cambia piano",
+    "Apply mode": "Quando applicare",
+    "End of period": "A fine periodo",
+    "Immediate": "Immediato",
+    "Pending plan change": "Cambio pianificato a :plan il :date",
+    "Cancel pending change": "Annulla cambio pianificato"
 }

@@ -41,5 +41,11 @@
     "Slot released": "槽位已释放",
     "Start Date": "开始日期",
     "Empty means the license never expires.": "留空表示许可证永不过期。",
-    ":type quantity": ":type 数量"
+    ":type quantity": ":type 数量",
+    "Change plan": "更改套餐",
+    "Apply mode": "应用时机",
+    "End of period": "周期结束时",
+    "Immediate": "立即",
+    "Pending plan change": "计划于 :date 更改为 :plan",
+    "Cancel pending change": "取消计划中的更改"
 }

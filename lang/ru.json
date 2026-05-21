@@ -41,5 +41,11 @@
     "Slot released": "Слот освобождён",
     "Start Date": "Дата начала",
     "Empty means the license never expires.": "Пустое значение означает, что лицензия не истекает.",
-    ":type quantity": "Количество :type"
+    ":type quantity": "Количество :type",
+    "Change plan": "Сменить тариф",
+    "Apply mode": "Когда применить",
+    "End of period": "В конце периода",
+    "Immediate": "Немедленно",
+    "Pending plan change": "Запланирована смена на :plan — :date",
+    "Cancel pending change": "Отменить запланированную смену"
 }

@@ -9,9 +9,8 @@ use Awcodes\BadgeableColumn\Components\BadgeableColumn;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -25,9 +24,9 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use LucaLongo\LaravelEntitlements\Enums\BillingPeriod;
 use LucaLongo\LaravelEntitlements\Enums\LicenseUsageStatus;
+use LucaLongo\LaravelEntitlements\Enums\PlanTransitionMode;
 use LucaLongo\LaravelEntitlements\Facades\Entitlements;
 use LucaLongo\LaravelEntitlements\Models\License;
 use LucaLongo\LaravelEntitlements\Models\Plan;
@@ -78,6 +77,27 @@ final class LicensesRelationManager extends RelationManager
                     ->label(__('Validity'))
                     ->state(fn (License $record): string => $record->starts_at->translatedFormat('M j, Y'))
                     ->description(fn (License $record): string => $record->ends_at?->translatedFormat('M j, Y') ?? __('Perpetual')),
+
+                TextColumn::make('pending_transition')
+                    ->label('')
+                    ->state(function (License $record): ?string {
+                        if ($record->parent_id !== null) {
+                            return null;
+                        }
+
+                        $pending = $record->pendingTransition();
+
+                        if ($pending === null) {
+                            return null;
+                        }
+
+                        return __('Pending plan change', [
+                            'plan' => $pending->targetPlan->name,
+                            'date' => $pending->scheduled_at->toDayDateTimeString(),
+                        ]);
+                    })
+                    ->badge()
+                    ->color('warning'),
             ])
             ->headerActions([
                 Action::make('assignPlan')
@@ -171,61 +191,79 @@ final class LicensesRelationManager extends RelationManager
                     }),
             ])
             ->recordActions([
-                EditAction::make()
+                Action::make('changePlan')
+                    ->label(__('Change plan'))
+                    ->icon('heroicon-o-arrows-right-left')
                     ->iconButton()
-                    ->modalHeading(__('Edit Plan'))
-                    ->fillForm(function (License $record): array {
-                        return [
-                            'starts_at' => $record->starts_at,
-                            'ends_at' => $record->ends_at,
-                            'slot_totals' => self::groupLicenses($record)
-                                ->mapWithKeys(fn (License $l): array => [$l->id => $l->slot_total])
-                                ->all(),
-                        ];
-                    })
+                    ->visible(fn (License $record): bool => $record->parent_id === null)
                     ->form(fn (License $record): array => [
                         Grid::make(2)
                             ->schema([
-                                Placeholder::make('plan')
+                                Select::make('target_plan_id')
                                     ->label(__('Plan'))
-                                    ->content(self::planOptionLabel($record->plan))
+                                    ->options(fn (): array => Plan::query()
+                                        ->active()
+                                        ->with('items')
+                                        ->get()
+                                        ->mapWithKeys(fn (Plan $plan): array => [$plan->id => self::planOptionLabel($plan)])
+                                        ->all())
+                                    ->required()
+                                    ->live()
+                                    ->native(false)
                                     ->columnSpanFull(),
 
-                                DatePicker::make('starts_at')
-                                    ->label(__('Starts At'))
-                                    ->required(),
-
-                                DatePicker::make('ends_at')
-                                    ->label(__('Expiration'))
-                                    ->helperText(__('Empty means the license never expires.')),
+                                Radio::make('apply_mode')
+                                    ->label(__('Apply mode'))
+                                    ->options([
+                                        PlanTransitionMode::EndOfPeriod->value => __('End of period'),
+                                        PlanTransitionMode::Immediate->value => __('Immediate'),
+                                    ])
+                                    ->default(PlanTransitionMode::EndOfPeriod->value)
+                                    ->required()
+                                    ->columnSpanFull(),
 
                                 Group::make()
                                     ->columnSpanFull()
                                     ->columns(2)
-                                    ->schema(self::groupLicenses($record)
-                                        ->map(fn (License $l): TextInput => TextInput::make("slot_totals.{$l->id}")
-                                            ->label(trans(':type quantity', ['type' => self::typeLabel($l->type)]))
-                                            ->numeric()
-                                            ->minValue(0)
-                                            ->required())
-                                        ->all()),
+                                    ->schema(fn (Get $get): array => self::changePlanQuantityFields($get('target_plan_id'))),
                             ]),
                     ])
-                    ->using(function (License $record, array $data): License {
-                        DB::transaction(function () use ($record, $data): void {
-                            $startsAt = empty($data['starts_at']) ? null : CarbonImmutable::parse($data['starts_at']);
-                            $endsAt = empty($data['ends_at']) ? null : CarbonImmutable::parse($data['ends_at']);
+                    ->action(function (array $data, License $record): void {
+                        $newPlan = Plan::query()->findOrFail($data['target_plan_id']);
+                        $mode = PlanTransitionMode::from($data['apply_mode']);
 
-                            foreach (self::groupLicenses($record) as $license) {
-                                $license->update([
-                                    'starts_at' => $startsAt,
-                                    'ends_at' => $endsAt,
-                                    'slot_total' => (int) ($data['slot_totals'][$license->id] ?? $license->slot_total),
-                                ]);
-                            }
-                        });
+                        $overrides = collect($data['quantity_overrides'] ?? [])
+                            ->mapWithKeys(fn ($q, $id): array => [(int) $id => (int) $q])
+                            ->all();
 
-                        return $record->fresh();
+                        Entitlements::changePlan($record, $newPlan, $mode, $overrides);
+
+                        Notification::make()
+                            ->title(__('Change plan'))
+                            ->success()
+                            ->send();
+                    }),
+
+                Action::make('cancelTransition')
+                    ->label(__('Cancel pending change'))
+                    ->icon('heroicon-o-x-circle')
+                    ->iconButton()
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->visible(fn (License $record): bool => $record->parent_id === null && $record->pendingTransition() !== null)
+                    ->action(function (License $record): void {
+                        $pending = $record->pendingTransition();
+
+                        if ($pending === null) {
+                            return;
+                        }
+
+                        Entitlements::cancelTransition($pending);
+
+                        Notification::make()
+                            ->title(__('Cancel pending change'))
+                            ->success()
+                            ->send();
                     }),
                 Action::make('forceRelease')
                     ->label(__('Force Release Slot'))
@@ -284,6 +322,35 @@ final class LicensesRelationManager extends RelationManager
         return $plan->items
             ->where('is_flexible', true)
             ->map(fn (PlanItem $item): TextInput => TextInput::make("flexible_quantities.{$item->id}")
+                ->label(trans(':type quantity', ['type' => self::typeLabel($item->type)]))
+                ->numeric()
+                ->minValue(1)
+                ->required()
+                ->default($item->quantity))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Build a numeric input per flexible item of the targeted plan for plan changes.
+     *
+     * @return array<int, TextInput>
+     */
+    private static function changePlanQuantityFields(mixed $planId): array
+    {
+        if (empty($planId)) {
+            return [];
+        }
+
+        $plan = Plan::query()->with('items')->find($planId);
+
+        if ($plan === null) {
+            return [];
+        }
+
+        return $plan->items
+            ->where('is_flexible', true)
+            ->map(fn (PlanItem $item): TextInput => TextInput::make("quantity_overrides.{$item->id}")
                 ->label(trans(':type quantity', ['type' => self::typeLabel($item->type)]))
                 ->numeric()
                 ->minValue(1)
