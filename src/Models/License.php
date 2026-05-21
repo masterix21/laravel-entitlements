@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementType;
+use LucaLongo\LaravelEntitlements\Enums\PlanTransitionStatus;
 use LucaLongo\LaravelEntitlements\Exceptions\InvalidEntitlementTypeException;
 
 /**
@@ -72,6 +73,25 @@ final class License extends Model
         $model = config('entitlements.models.license_usage', LicenseUsage::class);
 
         return $this->hasMany($model);
+    }
+
+    public function transitions(): HasMany
+    {
+        /** @var class-string<PlanTransition> $model */
+        $model = config('entitlements.models.plan_transition', PlanTransition::class);
+
+        return $this->hasMany($model, 'anchor_license_id');
+    }
+
+    public function pendingTransition(): ?PlanTransition
+    {
+        /** @var PlanTransition|null $transition */
+        $transition = $this->transitions()
+            ->where('status', PlanTransitionStatus::Pending->value)
+            ->orderBy('scheduled_at')
+            ->first();
+
+        return $transition;
     }
 
     public function remaining(): Attribute
