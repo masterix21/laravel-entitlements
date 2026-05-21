@@ -223,6 +223,99 @@ $result = Entitlements::recalculate($workspace);
 // ['reconciled' => 7]
 ```
 
+## Plan transitions
+
+A license group (anchor + children) is immutable: the bound plan, the slot totals, and the
+category are never edited in place. To move a subscriber to a different plan you schedule or
+apply a **plan transition** through `Entitlements::changePlan()`. This guarantees a clean
+audit trail (old group is closed, new group is created) and lets you defer the switch to
+the end of the current billing window.
+
+### Apply an immediate or end-of-period change
+
+```php
+use LucaLongo\LaravelEntitlements\Enums\PlanTransitionMode;
+use LucaLongo\LaravelEntitlements\Facades\Entitlements;
+
+// Switch right now: closes the current group at `now()` and provisions the new one.
+Entitlements::changePlan($anchor, $proPlan, PlanTransitionMode::Immediate);
+
+// Defer to the end of the current cycle (anchor->ends_at). Returns a pending
+// PlanTransition that will be materialized later by the scheduler.
+$pending = Entitlements::changePlan($anchor, $proPlan, PlanTransitionMode::EndOfPeriod);
+
+// Optionally override the quantities of the new plan's flexible items.
+Entitlements::changePlan($anchor, $proPlan, PlanTransitionMode::Immediate, [
+    $seatItemId => 25,
+]);
+```
+
+`$anchor` must be a top-level license (`parent_id === null`); passing a child throws.
+
+### Cancel a pending transition
+
+```php
+Entitlements::cancelTransition($pending);
+```
+
+Only transitions still in the `pending` status can be cancelled.
+
+### Apply due transitions
+
+Pending `EndOfPeriod` transitions are materialized by the
+`entitlements:apply-transitions` artisan command. Register it on the scheduler so
+deferred changes go live without manual intervention:
+
+```php
+use Illuminate\Console\Scheduling\Schedule;
+
+$schedule->command('entitlements:apply-transitions')->everyMinute();
+```
+
+You can also trigger the same logic from code (e.g. inside a job):
+
+```php
+$applied = Entitlements::applyDueTransitions(); // int — number of transitions materialized
+```
+
+If revalidation fails at apply time (e.g. another transition consumed capacity in the
+meantime) the offending transition is flipped to `failed` with a `failure_reason`; siblings
+keep being processed.
+
+### Multiple active plans per category
+
+By default a subscriber can hold only one active plan per `PlanCategory`. Set
+`allows_multiple_active_plans` on a category when you want to stack several plans of the
+same kind (e.g. add-on packs):
+
+```php
+PlanCategory::create([
+    'name' => 'Storage add-ons',
+    'allows_multiple_active_plans' => true,
+]);
+```
+
+When the flag is `false` (the default), `changePlan` enforces exclusivity: it refuses to
+schedule a transition that would leave the subscriber with two overlapping active plans in
+the same exclusive category.
+
+### Pre-validation rules
+
+`changePlan` validates the request **before** persisting anything. It throws a domain
+exception when:
+
+- the anchor is invalid (not a top-level license, or already expired);
+- `EndOfPeriod` is requested but the anchor has no `ends_at`;
+- the target plan's category is exclusive and the subscriber already holds another active
+  plan in that category;
+- the target plan does not provide every entitlement type that currently has open usages
+  on the active group;
+- the target plan's capacity for a given type is below the current `slot_used` for that
+  type.
+
+Because every change goes through this pipeline, license groups remain a faithful,
+append-only history of what the subscriber was entitled to over time.
+
 ## Domain model
 
 ```
