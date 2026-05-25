@@ -1,9 +1,14 @@
+![Laravel Entitlements](assets/banner.png)
+
 # Laravel Entitlements
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/masterix21/laravel-entitlements.svg?style=flat-square)](https://packagist.org/packages/masterix21/laravel-entitlements)
 [![Tests](https://img.shields.io/github/actions/workflow/status/masterix21/laravel-entitlements/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/masterix21/laravel-entitlements/actions/workflows/run-tests.yml)
 [![Total Downloads](https://img.shields.io/packagist/dt/masterix21/laravel-entitlements.svg?style=flat-square)](https://packagist.org/packages/masterix21/laravel-entitlements)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE.md)
+[![Sponsor](https://img.shields.io/badge/sponsor-%E2%9D%A4-ff69b4?style=flat-square&logo=github)](https://github.com/sponsors/masterix21)
+
+> If this package saves you time, please consider [**sponsoring my work on GitHub**](https://github.com/sponsors/masterix21/) — it directly funds maintenance and new features.
 
 A flexible entitlement management system for Laravel applications. Define subscription plans, issue licenses to any model, and track consumption — slot-based or pool-based — with project-specific entitlement types injected via configuration.
 
@@ -502,6 +507,10 @@ composer format
 ```
 
 Runs Laravel Pint with the default preset.
+
+## Support my work
+
+If you find this package useful, please consider [**sponsoring me on GitHub**](https://github.com/sponsors/masterix21/). Your support keeps this project actively maintained and helps me build more open-source tools for the Laravel community. ❤️
 
 ## Credits
 
