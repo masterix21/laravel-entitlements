@@ -2,6 +2,12 @@
 
 All notable changes to `laravel-entitlements` will be documented in this file.
 
+## 1.1.1 - 2026-06-05
+
+### Fixed
+
+- Eager load the `license` relation on open `LicenseUsage` rows (and the anchor `subscriber`) while applying a plan transition, preventing `LazyLoadingViolationException` in applications that enable `Model::preventLazyLoading()`. Transitions previously failed with the lazy loading message recorded in `failure_reason`.
+
 ## 1.1.0 - 2026-05-21
 
 Plan transitions (upgrade/downgrade) become a first-class concept, the Filament UI gains a cluster with top-tab navigation and a complete "Change plan" workflow, and category exclusivity can now be enforced on every assignment.
