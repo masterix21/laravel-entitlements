@@ -239,7 +239,7 @@ final class Entitlements
     private function applyTransition(PlanTransition $transition): void
     {
         /** @var License $anchor */
-        $anchor = $transition->anchorLicense()->firstOrFail();
+        $anchor = $transition->anchorLicense()->with('subscriber')->firstOrFail();
         /** @var Plan $newPlan */
         $newPlan = $transition->targetPlan()->with('items')->firstOrFail();
         $overrides = $transition->quantity_overrides ?? [];
@@ -275,6 +275,7 @@ final class Entitlements
 
                 $usages = LicenseUsage::query()
                     ->whereIn('license_id', $oldGroupIds)
+                    ->with('license')
                     ->open()
                     ->get();
 
