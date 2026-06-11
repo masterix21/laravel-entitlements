@@ -2,6 +2,18 @@
 
 All notable changes to `laravel-entitlements` will be documented in this file.
 
+## 1.1.2 - 2026-06-11
+
+### Fixed
+
+- Prevent double `slot_used` decrement when the same usage is released concurrently: `forceRelease()` in both `PoolStrategy` and `SlotStrategy` now re-fetches the usage with a row lock inside the transaction and re-checks its status before touching the counter. `LicenseReleased` is only dispatched when the release actually happened.
+- Log a warning when the guarded `slot_used` decrement affects no rows, so counter drift is visible instead of silent.
+- Run `Entitlements::reconcile()` inside a transaction with a row lock on the license, preventing it from overwriting a concurrent `consume()`.
+
+### Documentation
+
+- New "Authorization" section in the README clarifying that the Filament actions delegate authorization entirely to the host application.
+
 ## 1.1.1 - 2026-06-05
 
 ### Fixed
