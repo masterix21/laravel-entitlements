@@ -463,6 +463,16 @@ The relation manager provides these actions out of the box:
 
 By default Plan Categories appears nested under "Subscription Plans" in the navigation sidebar (`getNavigationParentItem()` on `PlanCategoryResource` matches `getNavigationLabel()` on `PlanResource`).
 
+### Authorization
+
+The package does not ship policies or gates: authorization is fully delegated to your application. The relation manager actions (Assign Plan, Edit Plan, Change Plan, Force Release Slot, delete) check data preconditions via `visible()`, but they do not perform any ownership or permission check on their own.
+
+This means anyone who can open the subscriber resource page can run those actions. Make sure to:
+
+- register Filament policies for the resources where you attach `LicensesRelationManager`, so Filament gates access to the owning record;
+- restrict panel access (`canAccessPanel()`) to trusted users;
+- never pass unvalidated request input to the package models or to the `Entitlements` service in your own code.
+
 ### Translating entitlement type labels
 
 The Filament UI labels enum cases in two ways:

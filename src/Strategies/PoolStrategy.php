@@ -6,6 +6,7 @@ namespace LucaLongo\LaravelEntitlements\Strategies;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementStrategy;
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementType;
 use LucaLongo\LaravelEntitlements\Enums\LicenseUsageStatus;
@@ -94,15 +95,42 @@ final class PoolStrategy implements EntitlementStrategy
             return;
         }
 
-        DB::transaction(function () use ($usage): void {
-            $amount = $usage->amount;
-            $usage->update(['status' => LicenseUsageStatus::Released]);
+        $released = DB::transaction(function () use ($usage): bool {
+            $locked = LicenseUsage::query()
+                ->whereKey($usage->getKey())
+                ->lockForUpdate()
+                ->first();
 
-            License::query()
-                ->whereKey($usage->license_id)
-                ->where('slot_used', '>=', $amount)
-                ->decrement('slot_used', $amount);
+            if ($locked === null) {
+                return false;
+            }
+
+            if ($locked->status === LicenseUsageStatus::Released) {
+                return false;
+            }
+
+            $locked->update(['status' => LicenseUsageStatus::Released]);
+
+            $affected = License::query()
+                ->whereKey($locked->license_id)
+                ->where('slot_used', '>=', $locked->amount)
+                ->decrement('slot_used', $locked->amount);
+
+            if ($affected === 0) {
+                Log::warning('Slot decrement skipped on release: license counters out of sync, reconcile needed.', [
+                    'license_id' => $locked->license_id,
+                    'license_usage_id' => $locked->getKey(),
+                ]);
+            }
+
+            return true;
         });
+
+        if (! $released) {
+            return;
+        }
+
+        $usage->refresh();
 
         LicenseReleased::dispatch($usage);
     }
