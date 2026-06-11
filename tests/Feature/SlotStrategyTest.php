@@ -9,6 +9,7 @@ use LucaLongo\LaravelEntitlements\Events\LicenseReleased;
 use LucaLongo\LaravelEntitlements\Events\ReleaseRequested;
 use LucaLongo\LaravelEntitlements\Exceptions\NoEntitlementAvailableException;
 use LucaLongo\LaravelEntitlements\Models\License;
+use LucaLongo\LaravelEntitlements\Models\LicenseUsage;
 use LucaLongo\LaravelEntitlements\Models\Plan;
 use LucaLongo\LaravelEntitlements\Strategies\SlotStrategy;
 use Workbench\App\Enums\TestType;
@@ -105,4 +106,17 @@ it('forceRelease is idempotent when already released', function (): void {
     $strategy->forceRelease($usage);
 
     expect($this->license->fresh()->slot_used)->toBe($beforeUsed);
+});
+
+it('forceRelease with a stale instance does not double decrement', function (): void {
+    $strategy = new SlotStrategy;
+    $first = $strategy->consume($this->subscriber, TestType::Single, Subject::create());
+    $strategy->consume($this->subscriber, TestType::Single, Subject::create());
+
+    $stale = LicenseUsage::query()->findOrFail($first->getKey());
+
+    $strategy->forceRelease($first);
+    $strategy->forceRelease($stale);
+
+    expect($this->license->fresh()->slot_used)->toBe(1);
 });

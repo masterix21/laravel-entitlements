@@ -124,12 +124,21 @@ final class Entitlements
 
     public function reconcile(License $license): void
     {
-        $open = (int) $license->usages()->open()->sum('amount');
+        DB::transaction(function () use ($license): void {
+            $locked = License::query()
+                ->whereKey($license->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $license->update([
-            'slot_used' => $open,
-            'last_checked_at' => now(),
-        ]);
+            $open = (int) $locked->usages()->open()->sum('amount');
+
+            $locked->update([
+                'slot_used' => $open,
+                'last_checked_at' => now(),
+            ]);
+        });
+
+        $license->refresh();
 
         LicenseReconciled::dispatch($license);
     }

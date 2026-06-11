@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Carbon\CarbonInterface;
 use LucaLongo\LaravelEntitlements\Exceptions\NoEntitlementAvailableException;
 use LucaLongo\LaravelEntitlements\Models\License;
+use LucaLongo\LaravelEntitlements\Models\LicenseUsage;
 use LucaLongo\LaravelEntitlements\Models\Plan;
 use LucaLongo\LaravelEntitlements\Strategies\PoolStrategy;
 use Workbench\App\Enums\TestType;
@@ -74,4 +75,17 @@ it('forceRelease subtracts amount from license slot_used', function (): void {
 
 it('supportsTwoPhaseRelease is false', function (): void {
     expect((new PoolStrategy)->supportsTwoPhaseRelease())->toBeFalse();
+});
+
+it('forceRelease with a stale instance does not double decrement', function (): void {
+    $license = makePoolLicense($this->subscriber, $this->plan, 100, now()->addMonth());
+    $strategy = new PoolStrategy;
+    $usage = $strategy->consume($this->subscriber, TestType::Pooled, Subject::create(), amount: 30);
+
+    $stale = LicenseUsage::query()->findOrFail($usage->getKey());
+
+    $strategy->forceRelease($usage);
+    $strategy->forceRelease($stale);
+
+    expect($license->fresh()->slot_used)->toBe(0);
 });
