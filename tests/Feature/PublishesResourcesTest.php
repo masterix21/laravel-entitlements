@@ -17,7 +17,7 @@ it('publishes the config under the entitlements-config tag', function (): void {
 
     $source = array_key_first($paths);
 
-    expect($source)->toEndWith('config'.DIRECTORY_SEPARATOR.'entitlements.php')
+    expect(str_replace('\\', '/', $source))->toEndWith('config/entitlements.php')
         ->and($paths[$source])->toBe(config_path('entitlements.php'));
 });
 
