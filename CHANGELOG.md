@@ -2,6 +2,17 @@
 
 All notable changes to `laravel-entitlements` will be documented in this file.
 
+## 1.1.3 - 2026-06-22
+
+### Fixed
+
+- Correct the `vendor:publish` tag names in the documentation. The tags follow the package short name used by `spatie/laravel-package-tools` — `Package::shortName()` strips the `laravel-` prefix — so the working tags are `entitlements-config`, `entitlements-migrations` and `entitlements-translations`, not `laravel-entitlements-*` as previously documented (#4).
+- Normalize the translations publish tag to `entitlements-translations` for consistency with the config and migration tags.
+
+### Tests
+
+- Add regression coverage asserting the three publish groups (`entitlements-config`, `entitlements-migrations`, `entitlements-translations`) are registered and that the legacy `laravel-entitlements-*` tags are not.
+
 ## 1.1.2 - 2026-06-11
 
 ### Fixed
