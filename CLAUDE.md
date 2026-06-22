@@ -21,8 +21,8 @@ The package is in early scaffolding: the Spatie skeleton has been renamed to `La
 
 - **Service provider**: `src/LaravelEntitlementsServiceProvider.php` configures the package via Spatie's fluent `Package` API (config file, views, migration `create_laravel_entitlements_table`, console command). Add new migrations/commands/views here using `hasMigration()`, `hasCommand()`, etc.
 - **Namespace**: `LucaLongo\LaravelEntitlements\` → `src/`; factories at `LucaLongo\LaravelEntitlements\Database\Factories\` → `database/factories/`.
-- **Migrations**: stub files in `database/migrations/` ending in `.php.stub` — published to the host app via `vendor:publish --tag="laravel-entitlements-migrations"`. Do NOT include `down()` methods in migrations (per user guidelines).
-- **Config**: `config/entitlements.php` published with tag `laravel-entitlements-config`.
+- **Migrations**: stub files in `database/migrations/` ending in `.php.stub` — published to the host app via `vendor:publish --tag="entitlements-migrations"`. Do NOT include `down()` methods in migrations (per user guidelines).
+- **Config**: `config/entitlements.php` published with tag `entitlements-config`.
 - **Tests**: Pest 4 + Orchestra Testbench 9/10/11. `tests/TestCase.php` wires the service provider and factory namespace resolver. `tests/Pest.php` configures the base test case. The migration auto-load block in `getEnvironmentSetUp` is commented out — uncomment when DB-backed tests are added.
 - **Workbench**: dev-only app at `workbench/app/` (namespace `Workbench\App\`) for Testbench-based integration scenarios.
 

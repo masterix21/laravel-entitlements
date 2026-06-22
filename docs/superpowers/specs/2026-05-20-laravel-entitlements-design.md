@@ -90,7 +90,7 @@ entitlement_license_usages
   INDEX (license_id, status)
 ```
 
-Le migration sono pubblicate come `.php.stub` con il tag `laravel-entitlements-migrations`. Nessun metodo `down()`.
+Le migration sono pubblicate come `.php.stub` con il tag `entitlements-migrations`. Nessun metodo `down()`.
 
 ## 5. Namespace e classi
 

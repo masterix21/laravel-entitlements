@@ -45,8 +45,8 @@ composer require masterix21/laravel-entitlements
 Publish the config and migrations:
 
 ```bash
-php artisan vendor:publish --tag="laravel-entitlements-config"
-php artisan vendor:publish --tag="laravel-entitlements-migrations"
+php artisan vendor:publish --tag="entitlements-config"
+php artisan vendor:publish --tag="entitlements-migrations"
 php artisan migrate
 ```
 
@@ -489,7 +489,7 @@ The package ships JSON translation files for English (`en`), Italian (`it`), Chi
 To customize the translations, publish them to your app's `lang/` directory:
 
 ```bash
-php artisan vendor:publish --tag="laravel-entitlements-translations"
+php artisan vendor:publish --tag="entitlements-translations"
 ```
 
 You can then edit `lang/it.json` and `lang/en.json` and add other locales (e.g. `lang/fr.json`) using the English strings as keys.
