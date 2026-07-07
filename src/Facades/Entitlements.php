@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Facade;
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementType;
+use LucaLongo\LaravelEntitlements\Data\EntitlementSnapshot;
 use LucaLongo\LaravelEntitlements\Entitlements as EntitlementsService;
 use LucaLongo\LaravelEntitlements\Models\License;
 use LucaLongo\LaravelEntitlements\Models\LicenseUsage;
@@ -23,6 +24,7 @@ use LucaLongo\LaravelEntitlements\Models\Plan;
  * @method static int available(Model $subscriber, EntitlementType $type)
  * @method static int capacity(Model $subscriber, EntitlementType $type)
  * @method static bool can(Model $subscriber, EntitlementType $type, int $amount = 1)
+ * @method static EntitlementSnapshot snapshot(Model $subscriber)
  * @method static void reconcile(License $license)
  * @method static array recalculate(Model $subscriber)
  */
