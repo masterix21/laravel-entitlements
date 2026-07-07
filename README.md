@@ -482,6 +482,82 @@ The Filament UI labels enum cases in two ways:
 
 The placeholder `:type quantity` (used as the "Quantità X" label in the assign/edit form) is also translatable.
 
+## Using with Inertia (or any JSON frontend)
+
+The package is headless: everything the Filament plugin does is a thin layer over the
+`Entitlements` service. If you use Inertia (Vue/React), a JSON API, or plain Blade, call the
+same service from your own controllers. The package ships read-side resources and a snapshot
+helper so you don't re-derive entitlement data by hand. It does **not** ship routes,
+controllers, Form Requests, or frontend components — those belong to your app.
+
+### Reading: entitlement snapshot
+
+`Entitlements::snapshot($subscriber)` returns capacity, used and available counts per
+entitlement type (one entry per configured `type_enum` case). The counts are not model
+attributes — they are computed from the subscriber's valid licenses.
+
+```php
+use LucaLongo\LaravelEntitlements\Facades\Entitlements;
+use LucaLongo\LaravelEntitlements\Http\Resources\EntitlementSnapshotResource;
+
+public function show(Workspace $workspace)
+{
+    return Inertia::render('Billing/Entitlements', [
+        'entitlements' => new EntitlementSnapshotResource(
+            Entitlements::snapshot($workspace),
+        ),
+    ]);
+}
+```
+
+The serialized payload:
+
+```json
+{
+    "types": [
+        { "type": "seats", "label": "Seats", "capacity": 10, "used": 4, "available": 6 }
+    ]
+}
+```
+
+`PlanResource` and `LicenseResource` serialize plans and licenses the same way (eager-load
+relations you serialize, e.g. `$plan->load('items')`).
+
+### Writing: assign, change, release
+
+Write operations go through the same service the Filament plugin uses. Validation and
+authorization are your app's responsibility.
+
+```php
+use Carbon\CarbonImmutable;
+use LucaLongo\LaravelEntitlements\Facades\Entitlements;
+use LucaLongo\LaravelEntitlements\Models\Plan;
+
+public function store(Request $request, Workspace $workspace)
+{
+    $data = $request->validate([
+        'plan_id' => ['required', 'integer', 'exists:plans,id'],
+        'starts_at' => ['required', 'date'],
+        'ends_at' => ['nullable', 'date', 'after:starts_at'],
+        'quantities' => ['array'],
+    ]);
+
+    Entitlements::assignPlan(
+        $workspace,
+        Plan::findOrFail($data['plan_id']),
+        CarbonImmutable::parse($data['starts_at']),
+        $data['quantities'] ?? [],
+        isset($data['ends_at']) ? CarbonImmutable::parse($data['ends_at']) : null,
+    );
+
+    return back();
+}
+```
+
+The service throws domain exceptions (see the [Exceptions](#exceptions) section) on invalid
+operations — catch them and convert to `ValidationException` or a redirect with errors as
+your app prefers.
+
 ## Translations
 
 The package ships JSON translation files for English (`en`), Italian (`it`), Chinese (`zh`) and Russian (`ru`) covering every string used by the Filament UI. They are loaded automatically — no extra setup needed.
