@@ -546,7 +546,7 @@ public function store(Request $request, Workspace $workspace)
         $workspace,
         Plan::findOrFail($data['plan_id']),
         CarbonImmutable::parse($data['starts_at']),
-        $data['quantities'] ?? [],
+        $data['quantities'] ?? [], // keyed by flexible PlanItem id; ignored for fixed items
         isset($data['ends_at']) ? CarbonImmutable::parse($data['ends_at']) : null,
     );
 
