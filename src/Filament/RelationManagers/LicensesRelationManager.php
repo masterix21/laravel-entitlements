@@ -38,6 +38,7 @@ use LucaLongo\LaravelEntitlements\Facades\Entitlements;
 use LucaLongo\LaravelEntitlements\Models\License;
 use LucaLongo\LaravelEntitlements\Models\Plan;
 use LucaLongo\LaravelEntitlements\Models\PlanItem;
+use LucaLongo\LaravelEntitlements\Support\EntitlementTypeLabel;
 
 final class LicensesRelationManager extends RelationManager
 {
@@ -468,11 +469,7 @@ final class LicensesRelationManager extends RelationManager
 
     private static function typeLabel(mixed $type): string
     {
-        if ($type === null) {
-            return '';
-        }
-
-        return method_exists($type, 'getLabel') ? $type->getLabel() : (isset($type->name) ? __($type->name) : (string) $type);
+        return EntitlementTypeLabel::resolve($type);
     }
 
     private static function notifyDomainError(\Throwable $e): void
