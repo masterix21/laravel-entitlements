@@ -40,7 +40,7 @@ final class Entitlements
      * @param  array<int, int>  $quantityOverrides  keyed by PlanItem id, applied only to flexible items
      * @return Collection<int, License>
      */
-    public function assignPlan(Model $subscriber, Plan $plan, CarbonInterface $startsAt, array $quantityOverrides = []): Collection
+    public function assignPlan(Model $subscriber, Plan $plan, CarbonInterface $startsAt, array $quantityOverrides = [], ?CarbonInterface $endsAt = null): Collection
     {
         $this->assertCategoryExclusivity(
             $subscriber->getMorphClass(),
@@ -48,7 +48,7 @@ final class Entitlements
             $plan,
         );
 
-        $endsAt = $plan->is_recurring
+        $endsAt ??= $plan->is_recurring
             ? null
             : $plan->billing_period->advance($startsAt);
 

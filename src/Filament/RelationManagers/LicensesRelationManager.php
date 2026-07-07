@@ -181,23 +181,22 @@ final class LicensesRelationManager extends RelationManager
                             ->mapWithKeys(fn ($q, $id): array => [(int) $id => (int) $q])
                             ->all();
 
+                        $endsAt = ! empty($data['ends_at'])
+                            ? CarbonImmutable::parse($data['ends_at'])
+                            : null;
+
                         try {
-                            $licenses = Entitlements::assignPlan(
+                            Entitlements::assignPlan(
                                 $this->getOwnerRecord(),
                                 $plan,
                                 CarbonImmutable::parse($data['starts_at']),
                                 $overrides,
+                                $endsAt,
                             );
                         } catch (PlanCategoryExclusivityViolation $e) {
                             self::notifyDomainError($e);
 
                             return;
-                        }
-
-                        if (! empty($data['ends_at'])) {
-                            $endsAt = CarbonImmutable::parse($data['ends_at']);
-
-                            $licenses->each(fn ($license) => $license->update(['ends_at' => $endsAt]));
                         }
 
                         Notification::make()

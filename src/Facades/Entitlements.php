@@ -16,7 +16,7 @@ use LucaLongo\LaravelEntitlements\Models\LicenseUsage;
 use LucaLongo\LaravelEntitlements\Models\Plan;
 
 /**
- * @method static Collection<int, License> assignPlan(Model $subscriber, Plan $plan, CarbonInterface $startsAt, array $quantityOverrides = [])
+ * @method static Collection<int, License> assignPlan(Model $subscriber, Plan $plan, CarbonInterface $startsAt, array $quantityOverrides = [], ?CarbonInterface $endsAt = null)
  * @method static LicenseUsage consume(Model $subscriber, EntitlementType $type, Model $subject, int $amount = 1)
  * @method static void requestRelease(LicenseUsage $usage)
  * @method static void confirmRelease(LicenseUsage $usage)

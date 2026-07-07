@@ -94,3 +94,18 @@ it('assigns the first license as anchor and subsequent licenses as children', fu
     $children = $licenses->skip(1);
     expect($children->every(fn ($l) => $l->parent_id === $anchor->id))->toBeTrue();
 });
+
+it('uses an explicit endsAt over the plan-derived default', function (): void {
+    $plan = Plan::factory()->create([
+        'billing_period' => BillingPeriod::Monthly->value,
+        'is_recurring' => false,
+    ]);
+    PlanItem::factory()->for($plan)->create(['type' => TestType::Single->value, 'quantity' => 1]);
+
+    $startsAt = now()->startOfDay();
+    $explicitEnd = $startsAt->copy()->addYear();
+
+    $licenses = Entitlements::assignPlan($this->subscriber, $plan, $startsAt, endsAt: $explicitEnd);
+
+    expect($licenses->every(fn ($l) => $l->ends_at !== null && $l->ends_at->equalTo($explicitEnd)))->toBeTrue();
+});
