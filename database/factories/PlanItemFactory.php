@@ -15,9 +15,21 @@ final class PlanItemFactory extends Factory
     public function definition(): array
     {
         return [
-            'type' => TestType::Single->value,
+            'type' => $this->resolveType(),
             'quantity' => 1,
             'is_flexible' => false,
         ];
+    }
+
+    private function resolveType(): string
+    {
+        /** @var class-string<\BackedEnum>|null $enum */
+        $enum = config('entitlements.type_enum');
+
+        if ($enum === null && class_exists(TestType::class)) {
+            $enum = TestType::class;
+        }
+
+        return $enum::cases()[0]->value;
     }
 }

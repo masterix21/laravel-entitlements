@@ -2,6 +2,13 @@
 
 All notable changes to `laravel-entitlements` will be documented in this file.
 
+## 1.1.5 - 2026-07-08
+
+### Fixed
+
+- `PlanItemFactory` no longer references the workbench `TestType` (usable by consumers). It now resolves the entitlement type from the consumer's configured `entitlements.type_enum`, falling back to the workbench enum only inside this package's own test environment (guarded by `class_exists`).
+- `PlanResource` now exposes each item's `id` (needed to key quantity overrides). `Entitlements::assignPlan()` / `changePlan()` key `quantityOverrides` by `PlanItem` id, so a frontend can now map override inputs to items.
+
 ## 1.1.4 - 2026-07-08
 
 Headless support for Laravel Inertia (and any JSON frontend). The write business logic already lives in the framework-agnostic `Entitlements` service, so this release adds only the read-side building blocks plus one DRY refactor. No routes, controllers, Form Requests or frontend components are shipped, and there is no dependency on `inertiajs/inertia-laravel`.

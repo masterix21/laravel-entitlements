@@ -40,6 +40,7 @@ it('serializes a plan with its items', function (): void {
     expect($payload['billing_period'])->toBe(BillingPeriod::Monthly->value);
     expect($payload['is_recurring'])->toBeTrue();
     expect($payload['items'])->toHaveCount(1);
+    expect($payload['items'][0]['id'])->toBe($plan->items->first()->getKey());
     expect($payload['items'][0]['type'])->toBe(TestType::Pooled->value);
     expect($payload['items'][0]['quantity'])->toBe(100);
     expect($payload['items'][0]['is_flexible'])->toBeTrue();

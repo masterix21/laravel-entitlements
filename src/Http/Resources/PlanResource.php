@@ -27,6 +27,7 @@ final class PlanResource extends JsonResource
             'is_recurring' => $this->is_recurring,
             'is_active' => $this->is_active,
             'items' => $this->items->map(fn (PlanItem $item): array => [
+                'id' => $item->getKey(),
                 'type' => $item->type->value,
                 'label' => EntitlementTypeLabel::resolve($item->type),
                 'quantity' => $item->quantity,
