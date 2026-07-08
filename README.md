@@ -503,12 +503,17 @@ use LucaLongo\LaravelEntitlements\Http\Resources\EntitlementSnapshotResource;
 public function show(Workspace $workspace)
 {
     return Inertia::render('Billing/Entitlements', [
-        'entitlements' => new EntitlementSnapshotResource(
+        'entitlements' => (new EntitlementSnapshotResource(
             Entitlements::snapshot($workspace),
-        ),
+        ))->resolve(),
     ]);
 }
 ```
+
+`->resolve()` returns the resource's array **without** Inertia's default `data` wrapper, so
+the prop is exactly the object below (read `entitlements.types` on the client). Drop
+`->resolve()` if you prefer the wrapped `{ "data": { ... } }` shape and read
+`entitlements.data.types` instead.
 
 The serialized payload:
 
@@ -522,6 +527,39 @@ The serialized payload:
 
 `PlanResource` and `LicenseResource` serialize plans and licenses the same way (eager-load
 relations you serialize, e.g. `$plan->load('items')`).
+
+On the client, read the prop and render it however you like. A minimal, unstyled Vue page
+(`resources/js/Pages/Billing/Entitlements.vue`):
+
+```vue
+<script setup>
+defineProps({ entitlements: Object })
+</script>
+
+<template>
+    <table>
+        <thead>
+            <tr>
+                <th>Type</th>
+                <th>Used</th>
+                <th>Available</th>
+                <th>Capacity</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr v-for="type in entitlements.types" :key="type.type">
+                <td>{{ type.label }}</td>
+                <td>{{ type.used }}</td>
+                <td>{{ type.available }}</td>
+                <td>{{ type.capacity }}</td>
+            </tr>
+        </tbody>
+    </table>
+</template>
+```
+
+The React and Svelte adapters read the same `entitlements.types` prop — only the template
+syntax differs.
 
 ### Writing: assign, change, release
 
