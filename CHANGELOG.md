@@ -2,6 +2,25 @@
 
 All notable changes to `laravel-entitlements` will be documented in this file.
 
+## 1.1.4 - 2026-07-08
+
+Headless support for Laravel Inertia (and any JSON frontend). The write business logic already lives in the framework-agnostic `Entitlements` service, so this release adds only the read-side building blocks plus one DRY refactor. No routes, controllers, Form Requests or frontend components are shipped, and there is no dependency on `inertiajs/inertia-laravel`.
+
+### Added
+
+- `Entitlements::snapshot(Model $subscriber): EntitlementSnapshot` — returns `capacity`, `used` and `available` counts per configured entitlement type (one entry per `type_enum` case, expired licenses excluded, `used = capacity - available`). Returns immutable `EntitlementSnapshot` / `EntitlementTypeUsage` DTOs.
+- Read-side JSON resources `PlanResource`, `LicenseResource` and `EntitlementSnapshotResource` (`LucaLongo\LaravelEntitlements\Http\Resources`) that serialize plans, licenses and the snapshot into stable, frontend-friendly payloads without leaking internal columns. Plain `JsonResource` classes usable from Inertia, a JSON API or Blade.
+- `EntitlementTypeLabel::resolve()` helper that resolves an entitlement type to a human label, shared between the Filament UI and the new resources.
+- Optional `?CarbonInterface $endsAt` parameter on `Entitlements::assignPlan()` to set an explicit license end date. Backward compatible: it is the last parameter and defaults to the plan-derived value when omitted.
+
+### Changed
+
+- `Filament\RelationManagers\LicensesRelationManager` now passes the explicit end date into `assignPlan()` instead of re-applying it after the call, removing duplicated logic and replacing a create-then-update with a single write.
+
+### Documentation
+
+- New "Using with Inertia (or any JSON frontend)" README section: reading via `snapshot()` + resources, writing via the facade from your own controllers, an unstyled Vue example, and a note on Inertia's `data` wrapping (using `->resolve()` to expose the prop unwrapped).
+
 ## 1.1.3 - 2026-06-22
 
 ### Fixed
