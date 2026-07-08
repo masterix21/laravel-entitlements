@@ -10,6 +10,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementStrategy;
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementType;
+use LucaLongo\LaravelEntitlements\Data\EntitlementSnapshot;
+use LucaLongo\LaravelEntitlements\Data\EntitlementTypeUsage;
 use LucaLongo\LaravelEntitlements\Enums\PlanTransitionMode;
 use LucaLongo\LaravelEntitlements\Enums\PlanTransitionStatus;
 use LucaLongo\LaravelEntitlements\Events\LicenseReconciled;
@@ -21,6 +23,7 @@ use LucaLongo\LaravelEntitlements\Events\PlanTransitionScheduled;
 use LucaLongo\LaravelEntitlements\Exceptions\AnchorNotActiveForTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\IncompatiblePlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\InsufficientCapacityForTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\InvalidEntitlementTypeException;
 use LucaLongo\LaravelEntitlements\Exceptions\InvalidTransitionScheduledDate;
 use LucaLongo\LaravelEntitlements\Exceptions\NoOpPlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\PlanCategoryExclusivityViolation;
@@ -37,7 +40,7 @@ final class Entitlements
      * @param  array<int, int>  $quantityOverrides  keyed by PlanItem id, applied only to flexible items
      * @return Collection<int, License>
      */
-    public function assignPlan(Model $subscriber, Plan $plan, CarbonInterface $startsAt, array $quantityOverrides = []): Collection
+    public function assignPlan(Model $subscriber, Plan $plan, CarbonInterface $startsAt, array $quantityOverrides = [], ?CarbonInterface $endsAt = null): Collection
     {
         $this->assertCategoryExclusivity(
             $subscriber->getMorphClass(),
@@ -45,7 +48,7 @@ final class Entitlements
             $plan,
         );
 
-        $endsAt = $plan->is_recurring
+        $endsAt ??= $plan->is_recurring
             ? null
             : $plan->billing_period->advance($startsAt);
 
@@ -120,6 +123,30 @@ final class Entitlements
     public function can(Model $subscriber, EntitlementType $type, int $amount = 1): bool
     {
         return $this->available($subscriber, $type) >= $amount;
+    }
+
+    public function snapshot(Model $subscriber): EntitlementSnapshot
+    {
+        /** @var class-string<EntitlementType>|null $enum */
+        $enum = config('entitlements.type_enum');
+
+        if ($enum === null) {
+            throw InvalidEntitlementTypeException::missing();
+        }
+
+        $types = array_map(function (EntitlementType $type) use ($subscriber): EntitlementTypeUsage {
+            $capacity = $this->capacity($subscriber, $type);
+            $available = $this->available($subscriber, $type);
+
+            return new EntitlementTypeUsage(
+                type: $type,
+                capacity: $capacity,
+                used: $capacity - $available,
+                available: $available,
+            );
+        }, $enum::cases());
+
+        return new EntitlementSnapshot($subscriber, $types);
     }
 
     public function reconcile(License $license): void
