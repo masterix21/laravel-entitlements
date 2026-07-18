@@ -2,6 +2,42 @@
 
 All notable changes to `laravel-entitlements` will be documented in this file.
 
+## 1.2.0 - 2026-07-18
+
+Security hardening release: closes all 12 findings of an internal security review (ENT-01 … ENT-12) focused on entitlement integrity under concurrency. Most fixes are transactional locking with no API surface changes; a few adjust runtime behavior — read **Changed** before upgrading.
+
+### Security
+
+- **Slot strategy ignored `$amount` (ENT-01)** — `SlotStrategy::consume()` silently consumed a single slot regardless of the requested amount, letting the host application grant N units while accounting for one. It now consumes N slots as N single-slot usages, spread across licenses (soonest-expiring first) atomically under row locks, and returns the first usage created.
+- **Plan transitions could be applied twice (ENT-02, ENT-04)** — `applyTransition()` re-reads the transition under `lockForUpdate` and aborts unless it is still `Pending`, so overlapping scheduler runs (`entitlements:apply-transitions` without `withoutOverlapping`, multiple workers) can no longer duplicate active license groups or overwrite an `Applied` outcome with `Failed`. `cancelTransition()` performs its check-and-update atomically under the same lock, closing the cancel/apply race.
+- **Category exclusivity TOCTOU (ENT-03)** — the exclusivity check and the license inserts are now serialized under a `lockForUpdate` on the category row (with the `allows_multiple_active_plans` flag re-read under lock), inside the `assignPlan()` and apply transactions. Two concurrent assignments can no longer both land in an exclusive category.
+- **Usages could be stranded on closed licenses (ENT-05)** — applying a transition now locks the old license group before any read and collects the usages to migrate with a locking read, so an in-flight `consume()` is either migrated to the new licenses or refused — never silently lost.
+- **Stacked pending transitions both applied (ENT-12)** — an anchor can now hold at most one pending transition; see **Changed**.
+- **Filament force release (ENT-11)** — the `forceRelease` action re-checks `status = Releasing` server-side; an `Active` usage cannot be force-released even bypassing the form's option validation.
+- **Information exposure (ENT-09, ENT-10)** — `failure_reason` keeps the exception message only for the package's own domain exceptions (already translated and user-safe); any other throwable is logged in full and replaced with a generic translated message. `NoEntitlementAvailableException` no longer embeds the subscriber class and ID in its message.
+
+### Changed
+
+- `SlotStrategy::consume()` honors `$amount` (previously always consumed 1) and throws `InvalidArgumentException` for non-positive amounts, matching `PoolStrategy`.
+- `Entitlements::changePlan()` **replaces** a previous pending transition for the same anchor: the old one is cancelled atomically (dispatching `PlanTransitionCancelled`) before the new one is created.
+- Quantity overrides `<= 0` now throw `InvalidArgumentException` from `assignPlan()`, `changePlan()` and the apply-time revalidation (previously only the Filament form validated them).
+- `NoEntitlementAvailableException` has a translated, user-safe message. Code inspecting the old message should switch to the new readonly properties `subscriber`, `type` and `requested`. Its constructor is now private — build it via `forSubscriber()`.
+- `PlanTransition.failure_reason` contains a generic message for unexpected (non-domain) errors; the full exception is in the application log.
+
+### Documentation
+
+- The README **Authorization** section now covers both Filament surfaces (plugin resources and `LicensesRelationManager`), includes a `Gate::policy` registration example for the package models, and calls out that the custom actions (Assign Plan, Change plan, Force Release Slot) are **not** covered by model policies and must be gated explicitly.
+- New **Deleting licenses is destructive** subsection: the delete action cascades to every `LicenseUsage`; to keep an append-only audit trail, deny `delete` in your `License` policy and close groups via `ends_at` instead.
+- The pending-transition replace semantics are documented in the plan transitions section.
+
+### Translations
+
+- Two new strings (generic transition failure, no-entitlement message) added to all shipped locales (`en`, `it`, `zh`, `ru`). If you published the translation files, re-publish them or add the new keys to your copies.
+
+### Tests
+
+- Suite grown from 92 to 104 tests (302 assertions): regression coverage for every finding, including state guards for the transition races (re-applying an `Applied`/`Cancelled` transition throws and alters nothing) and atomicity of rejected assignments.
+
 ## 1.1.5 - 2026-07-08
 
 ### Fixed
