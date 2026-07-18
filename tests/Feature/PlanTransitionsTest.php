@@ -293,6 +293,44 @@ it('allows assignPlan in exclusive category when no active plan exists', functio
     expect($licenses)->toHaveCount(1);
 });
 
+it('re-reads the category exclusivity flag from the database before enforcing', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $category = PlanCategory::create(['name' => 'Exclusive', 'allows_multiple_active_plans' => false]);
+
+    $planA = makePlan([['type' => TestType::Single->value, 'quantity' => 1]], $category->id);
+    $planB = makePlan([['type' => TestType::Single->value, 'quantity' => 1]], $category->id);
+
+    Entitlements::assignPlan($subscriber, $planA, now());
+
+    $planB->load('category');
+
+    // Concurrent toggle: the stale relation still says exclusive.
+    PlanCategory::query()->whereKey($category->id)->update(['allows_multiple_active_plans' => true]);
+
+    $licenses = Entitlements::assignPlan($subscriber, $planB, now());
+
+    expect($licenses)->toHaveCount(1);
+});
+
+it('creates no licenses when assignPlan is rejected for exclusivity', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $category = PlanCategory::create(['name' => 'Exclusive', 'allows_multiple_active_plans' => false]);
+
+    $planA = makePlan([['type' => TestType::Single->value, 'quantity' => 1]], $category->id);
+    $planB = makePlan([
+        ['type' => TestType::Single->value, 'quantity' => 1],
+        ['type' => TestType::Pooled->value, 'quantity' => 10],
+    ], $category->id);
+
+    Entitlements::assignPlan($subscriber, $planA, now());
+    $licenseCount = License::query()->count();
+
+    expect(fn () => Entitlements::assignPlan($subscriber, $planB, now()))
+        ->toThrow(PlanCategoryExclusivityViolation::class);
+
+    expect(License::query()->count())->toBe($licenseCount);
+});
+
 use Illuminate\Support\Facades\Event;
 use LucaLongo\LaravelEntitlements\Events\PlanTransitionApplied;
 use LucaLongo\LaravelEntitlements\Events\PlanTransitionScheduled;
@@ -370,6 +408,27 @@ it('materializes due transitions via applyDueTransitions', function (): void {
     expect($anchor->fresh()->ends_at->lessThanOrEqualTo(now()))->toBeTrue();
 });
 
+it('migrates usages consumed between scheduling and apply', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Pooled->value, 'quantity' => 10]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $endsAt = $anchor->ends_at;
+
+    $target = makePlan([['type' => TestType::Pooled->value, 'quantity' => 20]]);
+    $transition = Entitlements::changePlan($anchor, $target, PlanTransitionMode::EndOfPeriod);
+
+    $usage = Entitlements::consume($subscriber, TestType::Pooled, $subscriber, 4);
+
+    $this->travelTo($endsAt->copy()->addSecond());
+    expect(Entitlements::applyDueTransitions())->toBe(1);
+
+    $newAnchor = $transition->fresh()->newAnchorLicense;
+
+    expect($usage->fresh()->license_id)->toBe($newAnchor->id)
+        ->and($newAnchor->fresh()->slot_used)->toBe(4)
+        ->and($anchor->fresh()->ends_at->lessThanOrEqualTo(now()))->toBeTrue();
+});
+
 it('runs entitlements:apply-transitions command', function (): void {
     $subscriber = Subscriber::create(['name' => 'acme']);
     $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
@@ -437,4 +496,171 @@ it('marks transition as failed when revalidation in apply phase fails', function
         ->and($transition->fresh()->failure_reason)->not->toBeNull();
 
     Event::assertDispatched(PlanTransitionFailed::class);
+});
+
+use LucaLongo\LaravelEntitlements\Entitlements as EntitlementsService;
+
+/**
+ * Simulates a concurrent scheduler holding a transition loaded while it was
+ * still pending: applyTransition must re-check the persisted status itself.
+ */
+function applyTransitionDirectly(PlanTransition $transition): void
+{
+    $service = app(EntitlementsService::class);
+    (new ReflectionMethod($service, 'applyTransition'))->invoke($service, $transition);
+}
+
+it('refuses to re-apply an already applied transition and keeps its outcome', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $endsAt = $anchor->ends_at;
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $transition = Entitlements::changePlan($anchor, $target, PlanTransitionMode::EndOfPeriod);
+
+    $stale = PlanTransition::query()->findOrFail($transition->getKey());
+
+    $this->travelTo($endsAt->copy()->addSecond());
+    expect(Entitlements::applyDueTransitions())->toBe(1);
+
+    $appliedAt = $transition->fresh()->applied_at;
+    $newAnchorId = $transition->fresh()->new_anchor_license_id;
+    $licenseCount = License::query()->count();
+
+    expect(fn () => applyTransitionDirectly($stale))->toThrow(TransitionAlreadyResolved::class);
+
+    $fresh = $transition->fresh();
+    expect($fresh->status)->toBe(PlanTransitionStatus::Applied)
+        ->and($fresh->applied_at->equalTo($appliedAt))->toBeTrue()
+        ->and($fresh->new_anchor_license_id)->toBe($newAnchorId)
+        ->and(License::query()->count())->toBe($licenseCount);
+});
+
+it('refuses to apply a cancelled transition', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $endsAt = $anchor->ends_at;
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $transition = Entitlements::changePlan($anchor, $target, PlanTransitionMode::EndOfPeriod);
+
+    $stale = PlanTransition::query()->findOrFail($transition->getKey());
+
+    Entitlements::cancelTransition($transition);
+
+    $this->travelTo($endsAt->copy()->addSecond());
+    $licenseCount = License::query()->count();
+
+    expect(Entitlements::applyDueTransitions())->toBe(0);
+    expect(fn () => applyTransitionDirectly($stale))->toThrow(TransitionAlreadyResolved::class);
+
+    expect($transition->fresh()->status)->toBe(PlanTransitionStatus::Cancelled)
+        ->and(License::query()->count())->toBe($licenseCount)
+        ->and($anchor->fresh()->ends_at->equalTo($endsAt))->toBeTrue();
+});
+
+it('replaces a previous pending transition when scheduling a new one', function (): void {
+    Event::fake([PlanTransitionCancelled::class, PlanTransitionScheduled::class]);
+
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $endsAt = $anchor->ends_at;
+
+    $targetA = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $targetB = makePlan([['type' => TestType::Single->value, 'quantity' => 2]]);
+
+    $first = Entitlements::changePlan($anchor, $targetA, PlanTransitionMode::EndOfPeriod);
+    $second = Entitlements::changePlan($anchor, $targetB, PlanTransitionMode::EndOfPeriod);
+
+    expect($first->fresh()->status)->toBe(PlanTransitionStatus::Cancelled)
+        ->and($second->fresh()->status)->toBe(PlanTransitionStatus::Pending)
+        ->and($anchor->fresh()->pendingTransition()?->id)->toBe($second->id);
+
+    Event::assertDispatched(PlanTransitionCancelled::class);
+
+    $this->travelTo($endsAt->copy()->addSecond());
+
+    expect(Entitlements::applyDueTransitions())->toBe(1);
+    expect($first->fresh()->status)->toBe(PlanTransitionStatus::Cancelled)
+        ->and($second->fresh()->status)->toBe(PlanTransitionStatus::Applied);
+
+    $activeAnchors = License::query()
+        ->whereNull('parent_id')
+        ->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>', now()))
+        ->get();
+
+    expect($activeAnchors)->toHaveCount(1)
+        ->and($activeAnchors->first()->plan_id)->toBe($targetB->id);
+});
+
+it('an immediate change cancels the previous pending transition', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+
+    $targetA = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $targetB = makePlan([['type' => TestType::Single->value, 'quantity' => 2]]);
+
+    $pending = Entitlements::changePlan($anchor, $targetA, PlanTransitionMode::EndOfPeriod);
+    $immediate = Entitlements::changePlan($anchor->fresh(), $targetB, PlanTransitionMode::Immediate);
+
+    expect($pending->fresh()->status)->toBe(PlanTransitionStatus::Cancelled)
+        ->and($immediate->status)->toBe(PlanTransitionStatus::Applied);
+});
+
+it('rejects non-positive quantity overrides on assignPlan', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Pooled->value, 'quantity' => 10, 'is_flexible' => true]]);
+
+    expect(fn () => Entitlements::assignPlan($subscriber, $plan, now(), [$plan->items->first()->id => 0]))
+        ->toThrow(InvalidArgumentException::class);
+    expect(License::query()->count())->toBe(0);
+});
+
+it('rejects non-positive quantity overrides on changePlan', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Pooled->value, 'quantity' => 10, 'is_flexible' => true]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $target = makePlan([['type' => TestType::Pooled->value, 'quantity' => 20, 'is_flexible' => true]]);
+
+    expect(fn () => Entitlements::changePlan($anchor, $target, PlanTransitionMode::Immediate, [$target->items->first()->id => -5]))
+        ->toThrow(InvalidArgumentException::class);
+});
+
+it('stores a sanitized failure_reason for unexpected errors', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Pooled->value, 'quantity' => 10, 'is_flexible' => true]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $target = makePlan([['type' => TestType::Pooled->value, 'quantity' => 20, 'is_flexible' => true]]);
+
+    // Crafted directly to bypass changePlan validation: revalidation at apply
+    // time fails with a non-domain exception.
+    $transition = PlanTransition::create([
+        'anchor_license_id' => $anchor->id,
+        'target_plan_id' => $target->id,
+        'apply_mode' => PlanTransitionMode::EndOfPeriod->value,
+        'status' => PlanTransitionStatus::Pending->value,
+        'scheduled_at' => now()->subMinute(),
+        'quantity_overrides' => [$target->items->first()->id => 0],
+    ]);
+
+    Entitlements::applyDueTransitions();
+
+    $fresh = $transition->fresh();
+    expect($fresh->status)->toBe(PlanTransitionStatus::Failed)
+        ->and($fresh->failure_reason)->toBe(__('The plan change failed due to an unexpected error.'))
+        ->and($fresh->failure_reason)->not->toContain('greater than zero');
+});
+
+it('cancelTransition refreshes the given instance', function (): void {
+    $subscriber = Subscriber::create(['name' => 'acme']);
+    $plan = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $anchor = Entitlements::assignPlan($subscriber, $plan, now())->first();
+    $target = makePlan([['type' => TestType::Single->value, 'quantity' => 1]]);
+    $transition = Entitlements::changePlan($anchor, $target, PlanTransitionMode::EndOfPeriod);
+
+    Entitlements::cancelTransition($transition);
+
+    expect($transition->status)->toBe(PlanTransitionStatus::Cancelled);
 });

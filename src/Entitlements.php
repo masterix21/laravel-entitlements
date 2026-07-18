@@ -8,6 +8,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementStrategy;
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementType;
 use LucaLongo\LaravelEntitlements\Data\EntitlementSnapshot;
@@ -31,6 +32,7 @@ use LucaLongo\LaravelEntitlements\Exceptions\TransitionAlreadyResolved;
 use LucaLongo\LaravelEntitlements\Models\License;
 use LucaLongo\LaravelEntitlements\Models\LicenseUsage;
 use LucaLongo\LaravelEntitlements\Models\Plan;
+use LucaLongo\LaravelEntitlements\Models\PlanCategory;
 use LucaLongo\LaravelEntitlements\Models\PlanItem;
 use LucaLongo\LaravelEntitlements\Models\PlanTransition;
 
@@ -42,17 +44,19 @@ final class Entitlements
      */
     public function assignPlan(Model $subscriber, Plan $plan, CarbonInterface $startsAt, array $quantityOverrides = [], ?CarbonInterface $endsAt = null): Collection
     {
-        $this->assertCategoryExclusivity(
-            $subscriber->getMorphClass(),
-            $subscriber->getKey(),
-            $plan,
-        );
+        $this->assertValidQuantityOverrides($quantityOverrides);
 
         $endsAt ??= $plan->is_recurring
             ? null
             : $plan->billing_period->advance($startsAt);
 
         $licenses = DB::transaction(function () use ($subscriber, $plan, $startsAt, $endsAt, $quantityOverrides): Collection {
+            $this->assertCategoryExclusivity(
+                $subscriber->getMorphClass(),
+                $subscriber->getKey(),
+                $plan,
+            );
+
             $created = new Collection;
             $anchorId = null;
 
@@ -201,14 +205,46 @@ final class Entitlements
 
         $effectiveScheduledAt = $this->resolveScheduledAt($anchor, $mode, $scheduledAt);
 
-        $transition = PlanTransition::create([
-            'anchor_license_id' => $anchor->id,
-            'target_plan_id' => $newPlan->id,
-            'apply_mode' => $mode->value,
-            'status' => PlanTransitionStatus::Pending->value,
-            'scheduled_at' => $effectiveScheduledAt,
-            'quantity_overrides' => $quantityOverrides ?: null,
-        ]);
+        /** @var PlanTransition $transition */
+        /** @var Collection<int, PlanTransition> $replaced */
+        [$transition, $replaced] = DB::transaction(function () use ($anchor, $newPlan, $mode, $quantityOverrides, $effectiveScheduledAt): array {
+            $replaced = PlanTransition::query()
+                ->where('anchor_license_id', $anchor->id)
+                ->where('status', PlanTransitionStatus::Pending->value)
+                ->lockForUpdate()
+                ->get();
+
+            // Re-check the anchor under lock: a concurrent apply of the pending
+            // transition being replaced may have just closed it.
+            /** @var License $lockedAnchor */
+            $lockedAnchor = License::query()
+                ->whereKey($anchor->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedAnchor->ends_at !== null && $lockedAnchor->ends_at->lessThanOrEqualTo(now())) {
+                throw AnchorNotActiveForTransition::expired($anchor->id);
+            }
+
+            foreach ($replaced as $stale) {
+                $stale->update(['status' => PlanTransitionStatus::Cancelled->value]);
+            }
+
+            $transition = PlanTransition::create([
+                'anchor_license_id' => $anchor->id,
+                'target_plan_id' => $newPlan->id,
+                'apply_mode' => $mode->value,
+                'status' => PlanTransitionStatus::Pending->value,
+                'scheduled_at' => $effectiveScheduledAt,
+                'quantity_overrides' => $quantityOverrides ?: null,
+            ]);
+
+            return [$transition, $replaced];
+        });
+
+        foreach ($replaced as $cancelled) {
+            PlanTransitionCancelled::dispatch($cancelled->fresh());
+        }
 
         if ($mode === PlanTransitionMode::Immediate) {
             $this->applyTransition($transition);
@@ -248,12 +284,23 @@ final class Entitlements
 
     public function cancelTransition(PlanTransition $transition): void
     {
-        if ($transition->status !== PlanTransitionStatus::Pending) {
-            throw TransitionAlreadyResolved::forStatus($transition->status->value);
-        }
+        DB::transaction(function () use ($transition): void {
+            /** @var PlanTransition $locked */
+            $locked = PlanTransition::query()
+                ->whereKey($transition->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $transition->update(['status' => PlanTransitionStatus::Cancelled->value]);
-        PlanTransitionCancelled::dispatch($transition->fresh());
+            if ($locked->status !== PlanTransitionStatus::Pending) {
+                throw TransitionAlreadyResolved::forStatus($locked->status->value);
+            }
+
+            $locked->update(['status' => PlanTransitionStatus::Cancelled->value]);
+        });
+
+        $transition->refresh();
+
+        PlanTransitionCancelled::dispatch($transition);
     }
 
     public function applyDueTransitions(): int
@@ -265,7 +312,7 @@ final class Entitlements
                 $this->applyTransition($transition);
                 $applied++;
             } catch (\Throwable) {
-                // failure already recorded by applyTransition
+                // failure recorded by applyTransition, or transition resolved concurrently
             }
         });
 
@@ -274,15 +321,36 @@ final class Entitlements
 
     private function applyTransition(PlanTransition $transition): void
     {
-        /** @var License $anchor */
-        $anchor = $transition->anchorLicense()->with('subscriber')->firstOrFail();
-        /** @var Plan $newPlan */
-        $newPlan = $transition->targetPlan()->with('items')->firstOrFail();
-        $overrides = $transition->quantity_overrides ?? [];
-
         try {
-            DB::transaction(function () use ($transition, $anchor, $newPlan, $overrides): void {
-                $this->validateTransition($anchor, $newPlan, $overrides, PlanTransitionMode::Immediate, skipAnchorActiveCheck: $transition->apply_mode === PlanTransitionMode::EndOfPeriod);
+            /** @var License $anchor */
+            $anchor = DB::transaction(function () use ($transition): License {
+                /** @var PlanTransition $locked */
+                $locked = PlanTransition::query()
+                    ->whereKey($transition->getKey())
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ($locked->status !== PlanTransitionStatus::Pending) {
+                    throw TransitionAlreadyResolved::forStatus($locked->status->value);
+                }
+
+                // Lock the old license group before any read: the consume/release
+                // strategies lock the same rows, so in-flight consumptions either
+                // commit before this (and their usages get migrated) or wait and
+                // then find the group already closed.
+                $oldGroupIds = License::query()
+                    ->where('id', $locked->anchor_license_id)
+                    ->orWhere('parent_id', $locked->anchor_license_id)
+                    ->lockForUpdate()
+                    ->pluck('id');
+
+                /** @var License $anchor */
+                $anchor = $locked->anchorLicense()->with('subscriber')->firstOrFail();
+                /** @var Plan $newPlan */
+                $newPlan = $locked->targetPlan()->with('items')->firstOrFail();
+                $overrides = $locked->quantity_overrides ?? [];
+
+                $this->validateTransition($anchor, $newPlan, $overrides, PlanTransitionMode::Immediate, skipAnchorActiveCheck: $locked->apply_mode === PlanTransitionMode::EndOfPeriod);
 
                 $subscriber = $anchor->subscriber;
                 $transitionAt = now();
@@ -304,15 +372,11 @@ final class Entitlements
                     $newLicensesByType[$item->type->value] = $license;
                 }
 
-                $oldGroupIds = License::query()
-                    ->where('id', $anchor->id)
-                    ->orWhere('parent_id', $anchor->id)
-                    ->pluck('id');
-
                 $usages = LicenseUsage::query()
                     ->whereIn('license_id', $oldGroupIds)
                     ->with('license')
                     ->open()
+                    ->lockForUpdate()
                     ->get();
 
                 foreach ($usages as $usage) {
@@ -333,11 +397,13 @@ final class Entitlements
                     $this->reconcile($license->fresh());
                 }
 
-                $transition->update([
+                $locked->update([
                     'status' => PlanTransitionStatus::Applied->value,
                     'applied_at' => $transitionAt,
                     'new_anchor_license_id' => $newAnchorId,
                 ]);
+
+                return $anchor;
             });
 
             /** @var PlanTransition $fresh */
@@ -347,10 +413,13 @@ final class Entitlements
             /** @var License $oldAnchorFresh */
             $oldAnchorFresh = $anchor->fresh();
             PlanTransitionApplied::dispatch($fresh, $oldAnchorFresh, $newAnchor);
+        } catch (TransitionAlreadyResolved $e) {
+            // Resolved by a concurrent process: leave the recorded outcome untouched.
+            throw $e;
         } catch (\Throwable $e) {
             $transition->update([
                 'status' => PlanTransitionStatus::Failed->value,
-                'failure_reason' => $e->getMessage(),
+                'failure_reason' => $this->failureReasonFor($e),
             ]);
             PlanTransitionFailed::dispatch($transition->fresh(), $e);
             throw $e;
@@ -367,6 +436,8 @@ final class Entitlements
         PlanTransitionMode $mode,
         bool $skipAnchorActiveCheck = false,
     ): void {
+        $this->assertValidQuantityOverrides($quantityOverrides);
+
         if ($anchor->parent_id !== null) {
             throw AnchorNotActiveForTransition::notAnchor($anchor->id);
         }
@@ -478,6 +549,18 @@ final class Entitlements
             return;
         }
 
+        // Serializes concurrent check+insert on the category row; the lock is
+        // only effective when called inside a transaction (assignPlan, applyTransition).
+        /** @var PlanCategory|null $locked */
+        $locked = PlanCategory::query()
+            ->whereKey($category->getKey())
+            ->lockForUpdate()
+            ->first();
+
+        if ($locked === null || $locked->allows_multiple_active_plans) {
+            return;
+        }
+
         $conflict = License::query()
             ->where('subscriber_type', $subscriberType)
             ->where('subscriber_id', $subscriberId)
@@ -497,6 +580,33 @@ final class Entitlements
     private function strategyFor(LicenseUsage $usage): EntitlementStrategy
     {
         return $usage->license->type->strategy();
+    }
+
+    /**
+     * @param  array<int, int>  $quantityOverrides
+     */
+    private function assertValidQuantityOverrides(array $quantityOverrides): void
+    {
+        foreach ($quantityOverrides as $itemId => $quantity) {
+            if ((int) $quantity <= 0) {
+                throw new \InvalidArgumentException("Quantity override for plan item [{$itemId}] must be greater than zero.");
+            }
+        }
+    }
+
+    /**
+     * Domain exception messages are user-safe; anything else may carry
+     * internals (SQL, file paths), so it is logged and replaced.
+     */
+    private function failureReasonFor(\Throwable $e): string
+    {
+        if (str_starts_with($e::class, __NAMESPACE__.'\\Exceptions\\')) {
+            return $e->getMessage();
+        }
+
+        Log::error('Plan transition failed with an unexpected error.', ['exception' => $e]);
+
+        return (string) __('The plan change failed due to an unexpected error.');
     }
 
     /**
