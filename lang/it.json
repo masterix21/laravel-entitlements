@@ -62,5 +62,7 @@
     "At a specific date": "In una data specifica",
     "Scheduled date": "Data pianificata",
     "A scheduled date is required for this plan change.": "Per questo cambio piano è necessaria una data pianificata.",
-    "The scheduled date must be in the future.": "La data pianificata deve essere nel futuro."
+    "The scheduled date must be in the future.": "La data pianificata deve essere nel futuro.",
+    "The plan change failed due to an unexpected error.": "Il cambio piano non è riuscito per un errore imprevisto.",
+    "No \":type\" entitlement is available (requested: :requested).": "Nessuna disponibilità di \":type\" (richiesti: :requested)."
 }

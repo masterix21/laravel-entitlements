@@ -62,5 +62,7 @@
     "At a specific date": "At a specific date",
     "Scheduled date": "Scheduled date",
     "A scheduled date is required for this plan change.": "A scheduled date is required for this plan change.",
-    "The scheduled date must be in the future.": "The scheduled date must be in the future."
+    "The scheduled date must be in the future.": "The scheduled date must be in the future.",
+    "The plan change failed due to an unexpected error.": "The plan change failed due to an unexpected error.",
+    "No \":type\" entitlement is available (requested: :requested).": "No \":type\" entitlement is available (requested: :requested)."
 }

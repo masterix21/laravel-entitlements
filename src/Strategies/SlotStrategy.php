@@ -21,10 +21,19 @@ final class SlotStrategy implements EntitlementStrategy
 {
     public function __construct(public readonly bool $twoPhase = false) {}
 
+    /**
+     * Consumes $amount slots as individual single-slot usages for the same
+     * subject, spreading across licenses (soonest-expiring first) when needed.
+     * Returns the first usage created.
+     */
     public function consume(Model $subscriber, EntitlementType $type, Model $subject, int $amount = 1): LicenseUsage
     {
-        return DB::transaction(function () use ($subscriber, $type, $subject): LicenseUsage {
-            $license = License::query()
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException('Amount must be greater than zero.');
+        }
+
+        return DB::transaction(function () use ($subscriber, $type, $subject, $amount): LicenseUsage {
+            $licenses = License::query()
                 ->where('subscriber_type', $subscriber->getMorphClass())
                 ->where('subscriber_id', $subscriber->getKey())
                 ->valid()
@@ -32,25 +41,51 @@ final class SlotStrategy implements EntitlementStrategy
                 ->whereColumn('slot_used', '<', 'slot_total')
                 ->orderByRaw('ends_at IS NULL, ends_at ASC')
                 ->lockForUpdate()
-                ->first();
+                ->get();
 
-            if ($license === null) {
-                throw NoEntitlementAvailableException::forSubscriber($subscriber, $type, 1);
+            $available = $licenses->sum(fn (License $license): int => $license->remaining);
+
+            if ($available < $amount) {
+                throw NoEntitlementAvailableException::forSubscriber($subscriber, $type, $amount);
             }
 
-            $usage = LicenseUsage::query()->create([
-                'license_id' => $license->getKey(),
-                'subject_type' => $subject->getMorphClass(),
-                'subject_id' => $subject->getKey(),
-                'amount' => 1,
-                'status' => LicenseUsageStatus::Active,
-            ]);
+            $remaining = $amount;
+            $primaryUsage = null;
 
-            $license->increment('slot_used');
+            foreach ($licenses as $license) {
+                if ($remaining <= 0) {
+                    break;
+                }
 
-            LicenseConsumed::dispatch($usage);
+                $take = min($remaining, $license->remaining);
 
-            return $usage;
+                if ($take <= 0) {
+                    continue;
+                }
+
+                for ($i = 0; $i < $take; $i++) {
+                    $usage = LicenseUsage::query()->create([
+                        'license_id' => $license->getKey(),
+                        'subject_type' => $subject->getMorphClass(),
+                        'subject_id' => $subject->getKey(),
+                        'amount' => 1,
+                        'status' => LicenseUsageStatus::Active,
+                    ]);
+
+                    $primaryUsage ??= $usage;
+
+                    LicenseConsumed::dispatch($usage);
+                }
+
+                $license->increment('slot_used', $take);
+                $remaining -= $take;
+            }
+
+            if (! $primaryUsage instanceof LicenseUsage) {
+                throw NoEntitlementAvailableException::forSubscriber($subscriber, $type, $amount);
+            }
+
+            return $primaryUsage;
         });
     }
 

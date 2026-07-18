@@ -62,5 +62,7 @@
     "At a specific date": "在指定日期",
     "Scheduled date": "计划日期",
     "A scheduled date is required for this plan change.": "此套餐变更需要指定计划日期。",
-    "The scheduled date must be in the future.": "计划日期必须为将来。"
+    "The scheduled date must be in the future.": "计划日期必须为将来。",
+    "The plan change failed due to an unexpected error.": "套餐变更因意外错误而失败。",
+    "No \":type\" entitlement is available (requested: :requested).": "没有可用的“:type”权益（请求数量：:requested）。"
 }

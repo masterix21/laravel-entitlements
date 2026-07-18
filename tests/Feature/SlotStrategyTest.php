@@ -54,6 +54,88 @@ it('consume throws when no slot available', function (): void {
         ->toThrow(NoEntitlementAvailableException::class);
 });
 
+it('consume with amount creates one usage per slot', function (): void {
+    Event::fake([LicenseConsumed::class]);
+
+    $subject = Subject::create();
+    $strategy = new SlotStrategy;
+
+    $usage = $strategy->consume($this->subscriber, TestType::Single, $subject, 2);
+
+    $usages = $this->license->usages()->get();
+    expect($usages)->toHaveCount(2);
+    expect($usages->pluck('amount')->all())->toBe([1, 1]);
+    expect($usage->getKey())->toBe($usages->first()->getKey());
+    expect($this->license->fresh()->slot_used)->toBe(2);
+    Event::assertDispatchedTimes(LicenseConsumed::class, 2);
+});
+
+it('consume with amount spreads across licenses expiring first', function (): void {
+    $later = License::create([
+        'subscriber_type' => $this->subscriber->getMorphClass(),
+        'subscriber_id' => $this->subscriber->id,
+        'plan_id' => $this->plan->id,
+        'type' => TestType::Single->value,
+        'slot_total' => 2,
+        'slot_used' => 0,
+        'starts_at' => now()->subDay(),
+        'ends_at' => now()->addYear(),
+    ]);
+
+    $strategy = new SlotStrategy;
+
+    $strategy->consume($this->subscriber, TestType::Single, Subject::create(), 3);
+
+    expect($this->license->fresh()->slot_used)->toBe(2);
+    expect($later->fresh()->slot_used)->toBe(1);
+});
+
+it('consume with amount beyond total capacity throws and consumes nothing', function (): void {
+    $strategy = new SlotStrategy;
+    $subject = Subject::create();
+
+    expect(fn () => $strategy->consume($this->subscriber, TestType::Single, $subject, 3))
+        ->toThrow(NoEntitlementAvailableException::class);
+
+    expect($this->license->fresh()->slot_used)->toBe(0);
+    expect(LicenseUsage::query()->count())->toBe(0);
+});
+
+it('no-availability exception message is user-safe and carries context', function (): void {
+    $this->license->update(['slot_used' => 2]);
+    $strategy = new SlotStrategy;
+    $subject = Subject::create();
+
+    try {
+        $strategy->consume($this->subscriber, TestType::Single, $subject);
+        $this->fail('Expected NoEntitlementAvailableException.');
+    } catch (NoEntitlementAvailableException $e) {
+        expect($e->getMessage())->not->toContain('Workbench')
+            ->and($e->subscriber?->is($this->subscriber))->toBeTrue()
+            ->and($e->type)->toBe(TestType::Single)
+            ->and($e->requested)->toBe(1);
+    }
+});
+
+it('consume rejects a non-positive amount', function (): void {
+    $strategy = new SlotStrategy;
+    $subject = Subject::create();
+
+    expect(fn () => $strategy->consume($this->subscriber, TestType::Single, $subject, 0))
+        ->toThrow(InvalidArgumentException::class);
+    expect(fn () => $strategy->consume($this->subscriber, TestType::Single, $subject, -1))
+        ->toThrow(InvalidArgumentException::class);
+});
+
+it('releasing one of the usages frees a single slot', function (): void {
+    $strategy = new SlotStrategy;
+    $usage = $strategy->consume($this->subscriber, TestType::Single, Subject::create(), 2);
+
+    $strategy->forceRelease($usage);
+
+    expect($this->license->fresh()->slot_used)->toBe(1);
+});
+
 it('two-phase requestRelease keeps slot_used until confirm', function (): void {
     Event::fake([ReleaseRequested::class, LicenseReleased::class]);
 

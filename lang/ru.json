@@ -62,5 +62,7 @@
     "At a specific date": "В указанную дату",
     "Scheduled date": "Запланированная дата",
     "A scheduled date is required for this plan change.": "Для этого изменения плана требуется запланированная дата.",
-    "The scheduled date must be in the future.": "Запланированная дата должна быть в будущем."
+    "The scheduled date must be in the future.": "Запланированная дата должна быть в будущем.",
+    "The plan change failed due to an unexpected error.": "Не удалось изменить план из-за непредвиденной ошибки.",
+    "No \":type\" entitlement is available (requested: :requested).": "Нет доступных прав «:type» (запрошено: :requested)."
 }
