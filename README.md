@@ -265,6 +265,11 @@ Entitlements::cancelTransition($pending);
 
 Only transitions still in the `pending` status can be cancelled.
 
+You rarely need to do this by hand before scheduling a new change: an anchor never holds
+more than one pending transition. Calling `changePlan()` while another transition is pending
+cancels the previous one automatically (dispatching `PlanTransitionCancelled` for it) and
+replaces it with the new one.
+
 ### Apply due transitions
 
 Pending `EndOfPeriod` and `AtDate` transitions are materialized by the
@@ -457,21 +462,50 @@ public static function getRelations(): array
 The relation manager provides these actions out of the box:
 
 - **Assign Plan** — pick an active plan, set start/end dates, edit the quantity of every flexible item (defaults are pre-filled from the plan when you select it). Licenses created in the same assignment are grouped via `parent_id` so the table shows one row per assignment.
-- **Edit Plan** — same layout as Assign Plan with the plan shown read-only at the top. Lets you adjust `starts_at`, `ends_at` (propagated to anchor + children) and the quantity of every license in the group.
+- **Change plan** — start a plan transition for the group (immediate, end of period, or at a specific date), with quantity overrides for the target plan's flexible items. A pending transition is shown as a badge on the row and can be cancelled.
 - **Recalculate Usages** — reconcile every license owned by the subscriber.
 - **Force Release Slot** — admin override for usages stuck in `Releasing` (two-phase strategies).
+- **Delete** — permanently removes the license group (see [Deleting licenses is destructive](#deleting-licenses-is-destructive)).
 
 By default Plan Categories appears nested under "Subscription Plans" in the navigation sidebar (`getNavigationParentItem()` on `PlanCategoryResource` matches `getNavigationLabel()` on `PlanResource`).
 
 ### Authorization
 
-The package does not ship policies or gates: authorization is fully delegated to your application. The relation manager actions (Assign Plan, Edit Plan, Change Plan, Force Release Slot, delete) check data preconditions via `visible()`, but they do not perform any ownership or permission check on their own.
+The package does not ship policies or gates: authorization is fully delegated to your application. This applies to **both** Filament surfaces:
 
-This means anyone who can open the subscriber resource page can run those actions. Make sure to:
+- the plugin resources (**Plans**, **Plan Categories**) — without a policy, every user who can access the panel can create, edit and delete the whole plans catalog;
+- the `LicensesRelationManager` actions (Assign Plan, Change plan, Cancel pending change, Recalculate Usages, Force Release Slot, delete) — they check data preconditions via `visible()`, but perform no ownership or permission check on their own: anyone who can open the subscriber resource page can run them.
 
-- register Filament policies for the resources where you attach `LicensesRelationManager`, so Filament gates access to the owning record;
-- restrict panel access (`canAccessPanel()`) to trusted users;
-- never pass unvalidated request input to the package models or to the `Entitlements` service in your own code.
+Licenses and plans drive billing: treat these surfaces as privileged.
+
+- Restrict panel access (`canAccessPanel()`) to trusted users.
+- Register policies for the package models — Filament picks them up automatically for the resource pages and the standard actions (edit, delete):
+
+```php
+// e.g. in AppServiceProvider::boot()
+use Illuminate\Support\Facades\Gate;
+use LucaLongo\LaravelEntitlements\Models\License;
+use LucaLongo\LaravelEntitlements\Models\Plan;
+use LucaLongo\LaravelEntitlements\Models\PlanCategory;
+
+Gate::policy(Plan::class, \App\Policies\PlanPolicy::class);
+Gate::policy(PlanCategory::class, \App\Policies\PlanCategoryPolicy::class);
+Gate::policy(License::class, \App\Policies\LicensePolicy::class);
+```
+
+- The relation manager's custom actions (Assign Plan, Change plan, Force Release Slot) are **not** covered by model policies — Filament only gates its standard CRUD actions that way. Gate them explicitly: extend `LicensesRelationManager` and override `canViewForRecord()` to hide the whole manager from unauthorized users, or wrap the individual actions with your own `visible()` checks.
+- Never pass unvalidated request input to the package models or to the `Entitlements` service in your own code.
+
+#### Deleting licenses is destructive
+
+The delete action in `LicensesRelationManager` removes the license group permanently: child
+licenses are deleted first, and every related `LicenseUsage` row is dropped by the
+`ON DELETE CASCADE` foreign key. There are no soft deletes, so the subscriber's consumption
+history for that group is lost.
+
+If you need an append-only audit trail, deny `delete` in your `License` policy and close the
+group instead by setting `ends_at = now()` on its licenses — the same thing a plan transition
+does. An expired license keeps its usages and is excluded from every capacity computation.
 
 ### Translating entitlement type labels
 

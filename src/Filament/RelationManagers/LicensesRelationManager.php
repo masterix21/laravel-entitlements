@@ -352,7 +352,9 @@ final class LicensesRelationManager extends RelationManager
                         ->where('status', LicenseUsageStatus::Releasing)
                         ->exists())
                     ->action(function (array $data, $record): void {
-                        $usage = $record->usages()->findOrFail($data['license_usage_id']);
+                        $usage = $record->usages()
+                            ->where('status', LicenseUsageStatus::Releasing)
+                            ->findOrFail($data['license_usage_id']);
 
                         Entitlements::forceRelease($usage);
 
