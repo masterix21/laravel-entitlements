@@ -514,6 +514,8 @@ public function panel(Panel $panel): Panel
 }
 ```
 
+In the plan form, items whose type uses `BooleanStrategy` render as an *Enabled* toggle instead of the quantity input: the toggle maps to quantity `0`/`1` and the flexibility flag is hidden and forced off, so boolean entitlements can never be assigned a quantity from the UI.
+
 Opt out of either resource if you want to provide your own:
 
 ```php
@@ -722,7 +724,7 @@ You can then edit `lang/it.json` and `lang/en.json` and add other locales (e.g. 
 composer test
 ```
 
-The test suite runs against `:memory:` SQLite via Orchestra Testbench, with a workbench `TestType` enum that maps `Single → SlotStrategy(twoPhase: true)` and `Pooled → PoolStrategy`. A workbench Filament admin panel exercises the `EntitlementsPlugin`, the two Resources and the translation files (`en`/`it`/`zh`/`ru` parity).
+The test suite runs against `:memory:` SQLite via Orchestra Testbench, with two workbench enums: `TestType` maps `Single → SlotStrategy(twoPhase: true)` and `Pooled → PoolStrategy`, while `AdvancedTestType` covers `Slot`, `Computed` and `Boolean`. A workbench Filament admin panel exercises the `EntitlementsPlugin`, the two Resources (including a Livewire test that mounts the plan form end-to-end) and the translation files (`en`/`it`/`zh`/`ru` parity).
 
 ## Static analysis
 
@@ -730,7 +732,7 @@ The test suite runs against `:memory:` SQLite via Orchestra Testbench, with a wo
 composer analyse
 ```
 
-PHPStan level configured via `phpstan.neon.dist`. The `src/Filament` directory is excluded by default since Filament is not a dev dependency; install it locally if you want to lint the plugin too.
+PHPStan level configured via `phpstan.neon.dist`. The `src/Filament` directory is excluded from analysis by default; the plugin is covered by the Filament test suite instead.
 
 ## Code style
 
