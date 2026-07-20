@@ -21,9 +21,11 @@ Every SaaS reinvents the same wheel: plans, plan items, licenses with start/end 
 - **Polymorphic ownership** — any model with the `HasEntitlements` trait can hold licenses (workspace, team, user, tenant)
 - **Plans catalog** — categorized plans with billing period (monthly/yearly), recurring or fixed-term, with translatable names
 - **Plan items** — define how many slots of each type a plan grants; flexible items accept per-assignment overrides
-- **Two consumption strategies out of the box**:
+- **Four entitlement strategies out of the box**:
   - `SlotStrategy` — one usage per subject, with optional two-phase release (`Active → Releasing → Released`)
   - `PoolStrategy` — drainable counter across multiple licenses, FIFO by expiration
+  - `ComputedStrategy` — reads current usage from your application's own domain data
+  - `BooleanStrategy` — exposes an on/off feature flag without consumption
 - **Project-specific type enum** — declare your own backed enum (e.g. `Device`, `AiTokens`, `Seat`, `ApiCall`) and map each case to a strategy
 - **Domain events** — `PlanAssigned`, `LicenseConsumed`, `ReleaseRequested`, `LicenseReleased`, `LicenseReconciled`
 - **Reconciliation** — recompute `slot_used` from actual open usages, useful after manual intervention or drift
@@ -93,21 +95,27 @@ namespace App\Enums;
 
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementStrategy;
 use LucaLongo\LaravelEntitlements\Contracts\EntitlementType;
+use LucaLongo\LaravelEntitlements\Strategies\BooleanStrategy;
+use LucaLongo\LaravelEntitlements\Strategies\ComputedStrategy;
 use LucaLongo\LaravelEntitlements\Strategies\PoolStrategy;
 use LucaLongo\LaravelEntitlements\Strategies\SlotStrategy;
 
 enum LicenseType: string implements EntitlementType
 {
-    case Device   = 'device';
-    case AiTokens = 'ai_tokens';
-    case Seat     = 'seat';
+    case Device    = 'device';
+    case AiTokens  = 'ai_tokens';
+    case Seat      = 'seat';
+    case Guests    = 'guests';
+    case Analytics = 'analytics';
 
     public function strategy(): EntitlementStrategy
     {
         return match ($this) {
-            self::Device   => new SlotStrategy(twoPhase: true),
-            self::AiTokens => new PoolStrategy(),
-            self::Seat     => new SlotStrategy(),
+            self::Device    => new SlotStrategy(twoPhase: true),
+            self::AiTokens  => new PoolStrategy(),
+            self::Seat      => new SlotStrategy(),
+            self::Guests    => new ComputedStrategy(),
+            self::Analytics => new BooleanStrategy(),
         };
     }
 }
@@ -216,6 +224,58 @@ Entitlements::available($workspace, LicenseType::AiTokens); // sum of remaining 
 Entitlements::capacity($workspace, LicenseType::AiTokens);  // sum of slot_total across valid licenses
 Entitlements::can($workspace, LicenseType::AiTokens, 1500); // bool
 ```
+
+### Computed usage
+
+Use `ComputedStrategy` when the application already owns and counts the domain records being
+limited. For example, an event may allow at most 50 expected guests while the current usage is
+already represented by `guests.estimated_attendees`. Keeping a second mutable counter in
+`slot_used` would require every import, update, deletion, and bulk operation to synchronize it.
+
+Register one resolver per computed type, typically in a service provider's `boot()` method:
+
+```php
+use App\Enums\LicenseType;
+use App\Models\Event;
+use LucaLongo\LaravelEntitlements\Facades\Entitlements;
+
+Entitlements::resolveUsageUsing(
+    LicenseType::Guests,
+    fn (Event $event): int => (int) $event->guests()->sum('estimated_attendees'),
+);
+```
+
+Capacity still comes from all valid licenses of that type. Usage is resolved once per public
+availability call for the subscriber as a whole, even when several licenses contribute capacity:
+
+```php
+Entitlements::capacity($event, LicenseType::Guests);      // 50
+Entitlements::available($event, LicenseType::Guests);     // max(0, 50 - current guest total)
+Entitlements::can($event, LicenseType::Guests, amount: 4);
+```
+
+The resolver must return a non-negative integer. Missing resolvers and invalid results throw a
+diagnostic exception. Computed entitlements are read-only: `consume()` and all release methods
+throw, no `LicenseUsage` is created, and `slot_used` is never reconciled or updated.
+
+Choose the strategy by where the source of truth lives:
+
+- Use `SlotStrategy` when acquiring and releasing a subject is the usage event, such as activating a device.
+- Use `PoolStrategy` when each call drains a quantity, such as API credits or tokens.
+- Use `ComputedStrategy` when your application already stores mutable entities and can derive their current usage with a query, such as workspace members, projects, or expected event guests.
+
+### Boolean entitlements
+
+Use `BooleanStrategy` for feature flags that are enabled by valid capacity and are never consumed.
+Configure the plan item with `quantity = 1`, then query it explicitly:
+
+```php
+Entitlements::allows($workspace, LicenseType::Analytics); // true when valid capacity is greater than zero
+```
+
+Boolean entitlements are also read-only. Calling `consume()`, a release method, or `can()` throws
+instead of treating a flag as a consumable quantity. Calling `allows()` for a non-boolean type
+also throws, which keeps flag checks distinct from quantity checks.
 
 ### 8. Reconcile drifted counters
 

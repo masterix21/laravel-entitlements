@@ -64,5 +64,11 @@
     "A scheduled date is required for this plan change.": "A scheduled date is required for this plan change.",
     "The scheduled date must be in the future.": "The scheduled date must be in the future.",
     "The plan change failed due to an unexpected error.": "The plan change failed due to an unexpected error.",
-    "No \":type\" entitlement is available (requested: :requested).": "No \":type\" entitlement is available (requested: :requested)."
+    "No \":type\" entitlement is available (requested: :requested).": "No \":type\" entitlement is available (requested: :requested).",
+    "No computed usage resolver is registered for the \":type\" entitlement.": "No computed usage resolver is registered for the \":type\" entitlement.",
+    "A computed usage resolver cannot be registered for the non-computed \":type\" entitlement.": "A computed usage resolver cannot be registered for the non-computed \":type\" entitlement.",
+    "The computed usage resolver for the \":type\" entitlement must return a non-negative integer.": "The computed usage resolver for the \":type\" entitlement must return a non-negative integer.",
+    "The \":operation\" operation is not supported for the read-only \":type\" entitlement.": "The \":operation\" operation is not supported for the read-only \":type\" entitlement.",
+    "The \"allows\" operation is only supported for boolean entitlements; \":type\" uses a different strategy.": "The \"allows\" operation is only supported for boolean entitlements; \":type\" uses a different strategy.",
+    "The \"can\" operation is not supported for boolean entitlements; use \"allows\" for \":type\".": "The \"can\" operation is not supported for boolean entitlements; use \"allows\" for \":type\"."
 }

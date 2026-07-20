@@ -38,6 +38,7 @@ use LucaLongo\LaravelEntitlements\Facades\Entitlements;
 use LucaLongo\LaravelEntitlements\Models\License;
 use LucaLongo\LaravelEntitlements\Models\Plan;
 use LucaLongo\LaravelEntitlements\Models\PlanItem;
+use LucaLongo\LaravelEntitlements\Strategies\ReadOnlyStrategy;
 use LucaLongo\LaravelEntitlements\Support\EntitlementTypeLabel;
 
 final class LicensesRelationManager extends RelationManager
@@ -444,6 +445,10 @@ final class LicensesRelationManager extends RelationManager
 
     private static function resourceUsageLine(License $license): string
     {
+        if ($license->type->strategy() instanceof ReadOnlyStrategy) {
+            return number_format($license->slot_total).' '.self::typeLabel($license->type);
+        }
+
         return number_format($license->slot_used).' / '.number_format($license->slot_total).' '.self::typeLabel($license->type);
     }
 

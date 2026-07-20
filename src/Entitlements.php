@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LucaLongo\LaravelEntitlements;
 
 use Carbon\CarbonInterface;
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,7 @@ use LucaLongo\LaravelEntitlements\Events\PlanTransitionCancelled;
 use LucaLongo\LaravelEntitlements\Events\PlanTransitionFailed;
 use LucaLongo\LaravelEntitlements\Events\PlanTransitionScheduled;
 use LucaLongo\LaravelEntitlements\Exceptions\AnchorNotActiveForTransition;
+use LucaLongo\LaravelEntitlements\Exceptions\ComputedUsageResolverException;
 use LucaLongo\LaravelEntitlements\Exceptions\IncompatiblePlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\InsufficientCapacityForTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\InvalidEntitlementTypeException;
@@ -29,15 +31,22 @@ use LucaLongo\LaravelEntitlements\Exceptions\InvalidTransitionScheduledDate;
 use LucaLongo\LaravelEntitlements\Exceptions\NoOpPlanTransition;
 use LucaLongo\LaravelEntitlements\Exceptions\PlanCategoryExclusivityViolation;
 use LucaLongo\LaravelEntitlements\Exceptions\TransitionAlreadyResolved;
+use LucaLongo\LaravelEntitlements\Exceptions\UnsupportedEntitlementOperationException;
 use LucaLongo\LaravelEntitlements\Models\License;
 use LucaLongo\LaravelEntitlements\Models\LicenseUsage;
 use LucaLongo\LaravelEntitlements\Models\Plan;
 use LucaLongo\LaravelEntitlements\Models\PlanCategory;
 use LucaLongo\LaravelEntitlements\Models\PlanItem;
 use LucaLongo\LaravelEntitlements\Models\PlanTransition;
+use LucaLongo\LaravelEntitlements\Strategies\BooleanStrategy;
+use LucaLongo\LaravelEntitlements\Strategies\ComputedStrategy;
+use LucaLongo\LaravelEntitlements\Strategies\ReadOnlyStrategy;
 
 final class Entitlements
 {
+    /** @var array<string, Closure(Model): mixed> */
+    private array $computedUsageResolvers = [];
+
     /**
      * @param  array<int, int>  $quantityOverrides  keyed by PlanItem id, applied only to flexible items
      * @return Collection<int, License>
@@ -88,6 +97,15 @@ final class Entitlements
         return $type->strategy()->consume($subscriber, $type, $subject, $amount);
     }
 
+    public function resolveUsageUsing(EntitlementType $type, callable $resolver): void
+    {
+        if (! $type->strategy() instanceof ComputedStrategy) {
+            throw ComputedUsageResolverException::notComputed($type);
+        }
+
+        $this->computedUsageResolvers[$this->resolverKey($type)] = Closure::fromCallable($resolver);
+    }
+
     public function requestRelease(LicenseUsage $usage): void
     {
         $this->strategyFor($usage)->requestRelease($usage);
@@ -105,6 +123,18 @@ final class Entitlements
 
     public function available(Model $subscriber, EntitlementType $type): int
     {
+        $strategy = $type->strategy();
+
+        if ($strategy instanceof ComputedStrategy) {
+            $capacity = $this->capacity($subscriber, $type);
+
+            return max(0, $capacity - $this->computedUsage($subscriber, $type));
+        }
+
+        if ($strategy instanceof BooleanStrategy) {
+            return $this->capacity($subscriber, $type);
+        }
+
         return (int) License::query()
             ->where('subscriber_type', $subscriber->getMorphClass())
             ->where('subscriber_id', $subscriber->getKey())
@@ -126,7 +156,20 @@ final class Entitlements
 
     public function can(Model $subscriber, EntitlementType $type, int $amount = 1): bool
     {
+        if ($type->strategy() instanceof BooleanStrategy) {
+            throw UnsupportedEntitlementOperationException::canRequiresQuantified($type);
+        }
+
         return $this->available($subscriber, $type) >= $amount;
+    }
+
+    public function allows(Model $subscriber, EntitlementType $type): bool
+    {
+        if (! $type->strategy() instanceof BooleanStrategy) {
+            throw UnsupportedEntitlementOperationException::allowsRequiresBoolean($type);
+        }
+
+        return $this->capacity($subscriber, $type) > 0;
     }
 
     public function snapshot(Model $subscriber): EntitlementSnapshot
@@ -155,6 +198,10 @@ final class Entitlements
 
     public function reconcile(License $license): void
     {
+        if ($license->type->strategy() instanceof ReadOnlyStrategy) {
+            return;
+        }
+
         DB::transaction(function () use ($license): void {
             $locked = License::query()
                 ->whereKey($license->getKey())
@@ -182,7 +229,8 @@ final class Entitlements
         $licenses = License::query()
             ->where('subscriber_type', $subscriber->getMorphClass())
             ->where('subscriber_id', $subscriber->getKey())
-            ->get();
+            ->get()
+            ->reject(fn (License $license): bool => $license->type->strategy() instanceof ReadOnlyStrategy);
 
         foreach ($licenses as $license) {
             $this->reconcile($license);
@@ -580,6 +628,28 @@ final class Entitlements
     private function strategyFor(LicenseUsage $usage): EntitlementStrategy
     {
         return $usage->license->type->strategy();
+    }
+
+    private function computedUsage(Model $subscriber, EntitlementType $type): int
+    {
+        $resolver = $this->computedUsageResolvers[$this->resolverKey($type)] ?? null;
+
+        if ($resolver === null) {
+            throw ComputedUsageResolverException::missing($type);
+        }
+
+        $usage = $resolver($subscriber);
+
+        if (! is_int($usage) || $usage < 0) {
+            throw ComputedUsageResolverException::invalidResult($type);
+        }
+
+        return $usage;
+    }
+
+    private function resolverKey(EntitlementType $type): string
+    {
+        return $type::class.'::'.(string) $type->value;
     }
 
     /**

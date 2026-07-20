@@ -64,5 +64,11 @@
     "A scheduled date is required for this plan change.": "此套餐变更需要指定计划日期。",
     "The scheduled date must be in the future.": "计划日期必须为将来。",
     "The plan change failed due to an unexpected error.": "套餐变更因意外错误而失败。",
-    "No \":type\" entitlement is available (requested: :requested).": "没有可用的“:type”权益（请求数量：:requested）。"
+    "No \":type\" entitlement is available (requested: :requested).": "没有可用的“:type”权益（请求数量：:requested）。",
+    "No computed usage resolver is registered for the \":type\" entitlement.": "未为“:type”权益注册计算用量解析器。",
+    "A computed usage resolver cannot be registered for the non-computed \":type\" entitlement.": "不能为非计算型“:type”权益注册计算用量解析器。",
+    "The computed usage resolver for the \":type\" entitlement must return a non-negative integer.": "“:type”权益的计算用量解析器必须返回非负整数。",
+    "The \":operation\" operation is not supported for the read-only \":type\" entitlement.": "只读“:type”权益不支持“:operation”操作。",
+    "The \"allows\" operation is only supported for boolean entitlements; \":type\" uses a different strategy.": "“allows”操作仅支持布尔权益；“:type”使用其他策略。",
+    "The \"can\" operation is not supported for boolean entitlements; use \"allows\" for \":type\".": "布尔权益不支持“can”操作；请对“:type”使用“allows”。"
 }
