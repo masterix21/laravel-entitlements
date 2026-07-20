@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LucaLongo\LaravelEntitlements\Tests;
 
+use Awcodes\BadgeableColumn\BadgeableColumnServiceProvider;
 use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
 use BladeUI\Icons\BladeIconsServiceProvider;
 use CodeWithDennis\FilamentLucideIcons\FilamentLucideIconsServiceProvider;
@@ -54,6 +55,7 @@ class TestCase extends Orchestra
             BladeHeroiconsServiceProvider::class,
             BladeLucideIconsServiceProvider::class,
             FilamentLucideIconsServiceProvider::class,
+            BadgeableColumnServiceProvider::class,
             BladeCaptureDirectiveServiceProvider::class,
             AdminPanelProvider::class,
         ];
