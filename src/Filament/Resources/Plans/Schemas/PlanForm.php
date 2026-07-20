@@ -9,9 +9,14 @@ use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use LucaLongo\LaravelEntitlements\Contracts\EntitlementType;
 use LucaLongo\LaravelEntitlements\Enums\BillingPeriod;
 use LucaLongo\LaravelEntitlements\Models\PlanCategory;
+use LucaLongo\LaravelEntitlements\Strategies\BooleanStrategy;
 
 final class PlanForm
 {
@@ -64,15 +69,44 @@ final class PlanForm
                         Select::make('type')
                             ->options(fn (): array => self::typeOptions())
                             ->required()
+                            ->live()
+                            ->afterStateUpdated(function (mixed $state, Get $get, Set $set): void {
+                                if (self::isBooleanType($state)) {
+                                    $set('quantity', 1);
+                                    $set('enabled', true);
+                                    $set('is_flexible', false);
+
+                                    return;
+                                }
+
+                                if ((int) $get('quantity') < 1) {
+                                    $set('quantity', 1);
+                                }
+                            })
                             ->native(false),
 
-                        TextInput::make('quantity')
-                            ->numeric()
-                            ->minValue(1)
-                            ->required(),
+                        Group::make()
+                            ->schema([
+                                TextInput::make('quantity')
+                                    ->numeric()
+                                    ->minValue(fn (Get $get): ?int => self::isBooleanType($get('type')) ? null : 1)
+                                    ->required(fn (Get $get): bool => ! self::isBooleanType($get('type')))
+                                    ->hidden(fn (Get $get): bool => self::isBooleanType($get('type')))
+                                    ->dehydrateStateUsing(fn (mixed $state, Get $get): int => self::normalizeQuantity($state, $get('type'))),
+
+                                Toggle::make('enabled')
+                                    ->label(__('Enabled'))
+                                    ->default(true)
+                                    ->afterStateHydrated(fn (Toggle $component, Get $get): mixed => $component->state((int) $get('quantity') > 0))
+                                    ->afterStateUpdated(fn (bool $state, Set $set): mixed => $set('quantity', $state ? 1 : 0))
+                                    ->visible(fn (Get $get): bool => self::isBooleanType($get('type')))
+                                    ->dehydrated(false),
+                            ]),
 
                         Toggle::make('is_flexible')
-                            ->label(__('Flexible')),
+                            ->label(__('Flexible'))
+                            ->hidden(fn (Get $get): bool => self::isBooleanType($get('type')))
+                            ->dehydrateStateUsing(fn (bool $state, Get $get): bool => self::isBooleanType($get('type')) ? false : $state),
                     ]),
             ]);
     }
@@ -100,5 +134,40 @@ final class PlanForm
                 $case->value => method_exists($case, 'getLabel') ? $case->getLabel() : __($case->name),
             ])
             ->all();
+    }
+
+    private static function isBooleanType(mixed $value): bool
+    {
+        if (! is_string($value) && ! is_int($value)) {
+            return false;
+        }
+
+        /** @var class-string<EntitlementType>|null $enum */
+        $enum = config('entitlements.type_enum');
+
+        if ($enum === null) {
+            return false;
+        }
+
+        foreach ($enum::cases() as $type) {
+            if ((string) $type->value !== (string) $value) {
+                continue;
+            }
+
+            return $type->strategy() instanceof BooleanStrategy;
+        }
+
+        return false;
+    }
+
+    private static function normalizeQuantity(mixed $quantity, mixed $type): int
+    {
+        $quantity = (int) $quantity;
+
+        if (! self::isBooleanType($type)) {
+            return $quantity;
+        }
+
+        return $quantity > 0 ? 1 : 0;
     }
 }

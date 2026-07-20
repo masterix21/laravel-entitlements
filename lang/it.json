@@ -70,5 +70,6 @@
     "The computed usage resolver for the \":type\" entitlement must return a non-negative integer.": "Il resolver dell'utilizzo calcolato per l'entitlement \":type\" deve restituire un intero non negativo.",
     "The \":operation\" operation is not supported for the read-only \":type\" entitlement.": "L'operazione \":operation\" non è supportata per l'entitlement in sola lettura \":type\".",
     "The \"allows\" operation is only supported for boolean entitlements; \":type\" uses a different strategy.": "L'operazione \"allows\" è supportata solo per gli entitlement booleani; \":type\" usa una strategia diversa.",
-    "The \"can\" operation is not supported for boolean entitlements; use \"allows\" for \":type\".": "L'operazione \"can\" non è supportata per gli entitlement booleani; usa \"allows\" per \":type\"."
+    "The \"can\" operation is not supported for boolean entitlements; use \"allows\" for \":type\".": "L'operazione \"can\" non è supportata per gli entitlement booleani; usa \"allows\" per \":type\".",
+    "Enabled": "Abilitato"
 }

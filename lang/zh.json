@@ -70,5 +70,6 @@
     "The computed usage resolver for the \":type\" entitlement must return a non-negative integer.": "“:type”权益的计算用量解析器必须返回非负整数。",
     "The \":operation\" operation is not supported for the read-only \":type\" entitlement.": "只读“:type”权益不支持“:operation”操作。",
     "The \"allows\" operation is only supported for boolean entitlements; \":type\" uses a different strategy.": "“allows”操作仅支持布尔权益；“:type”使用其他策略。",
-    "The \"can\" operation is not supported for boolean entitlements; use \"allows\" for \":type\".": "布尔权益不支持“can”操作；请对“:type”使用“allows”。"
+    "The \"can\" operation is not supported for boolean entitlements; use \"allows\" for \":type\".": "布尔权益不支持“can”操作；请对“:type”使用“allows”。",
+    "Enabled": "已启用"
 }
