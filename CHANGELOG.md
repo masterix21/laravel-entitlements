@@ -2,6 +2,35 @@
 
 All notable changes to `laravel-entitlements` will be documented in this file.
 
+## 1.3.0 - 2026-07-20
+
+Feature release: two new read-only entitlement strategies — computed usage and boolean flags — with first-class Filament support, plus hardening fixes from the post-merge review.
+
+### Added
+
+- **`ComputedStrategy`** — usage comes from application code instead of usage rows: register a resolver with `Entitlements::resolveUsageUsing($type, fn ($subscriber) => ...)`; `available()` returns `max(0, capacity - resolver result)`. The resolver must return a non-negative integer (`ComputedUsageResolverException` otherwise) and is skipped entirely when the subscriber has no valid capacity for the type.
+- **`BooleanStrategy`** — on/off entitlements checked with the new `Entitlements::allows($subscriber, $type)`; calling `can()` on a boolean type (or `allows()` on a quantified one) throws `UnsupportedEntitlementOperationException`.
+- Both strategies extend the new abstract `ReadOnlyStrategy`: `consume()` and every release method throw, `reconcile()`/`recalculate()` leave their licenses untouched.
+- **Filament**: boolean plan items render as an *Enabled* toggle instead of a quantity input in the plan form; quantity and flexibility fields are hidden and normalized to the 0/1 invariant on save.
+
+### Fixed
+
+- Creating a boolean plan item from the Filament UI failed with a `NOT NULL` violation: the hidden `quantity` and `is_flexible` fields were not dehydrated. Both now use `dehydratedWhenHidden()`.
+- `Entitlements::snapshot()` no longer throws `ComputedUsageResolverException` for subscribers with no capacity for a computed type when no resolver is registered — the resolver is short-circuited at zero capacity.
+- The boolean 0/1 invariant is enforced at the domain layer (`assignPlan()`, `changePlan()`, transitions): quantity overrides are ignored for boolean items and legacy quantities above 1 are clamped on assignment. The Assign Plan / Change plan modals no longer offer quantity inputs for boolean items.
+
+### Translations
+
+- New strings for the computed/boolean exceptions and the Filament toggle added to all shipped locales (`en`, `it`, `zh`, `ru`). Re-publish the translation files or add the new keys to your copies.
+
+### Documentation
+
+- README: quickstart sections for computed usage and boolean entitlements, plus `ComputedStrategy` / `BooleanStrategy` entries in the Strategies reference.
+
+### Tests
+
+- Suite grown from 104 to 126 tests (420 assertions), including the package's first real Livewire form test (mounting the Filament plan form end-to-end) replacing source-string assertions.
+
 ## 1.2.0 - 2026-07-18
 
 Security hardening release: closes all 12 findings of an internal security review (ENT-01 … ENT-12) focused on entitlement integrity under concurrency. Most fixes are transactional locking with no API surface changes; a few adjust runtime behavior — read **Changed** before upgrading.
