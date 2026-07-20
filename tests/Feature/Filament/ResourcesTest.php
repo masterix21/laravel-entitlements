@@ -2,9 +2,13 @@
 
 declare(strict_types=1);
 
+use Filament\Facades\Filament;
 use Filament\Pages\Enums\SubNavigationPosition;
+use Livewire\Livewire;
+use LucaLongo\LaravelEntitlements\Enums\BillingPeriod;
 use LucaLongo\LaravelEntitlements\Filament\Clusters\SubscriptionPlansCluster;
 use LucaLongo\LaravelEntitlements\Filament\Resources\PlanCategories\PlanCategoryResource;
+use LucaLongo\LaravelEntitlements\Filament\Resources\Plans\Pages\ListPlans;
 use LucaLongo\LaravelEntitlements\Filament\Resources\Plans\PlanResource;
 use LucaLongo\LaravelEntitlements\Filament\Resources\Plans\Schemas\PlanForm;
 use LucaLongo\LaravelEntitlements\Models\Plan;
@@ -38,22 +42,58 @@ it('exposes translated model labels', function (): void {
     expect(PlanCategoryResource::getPluralModelLabel())->toBe(__('Plan Categories'));
 });
 
-it('renders boolean plan items as an enabled toggle instead of a quantity input', function (): void {
+it('exposes isBooleanType and normalizeQuantity helpers used by the boolean toggle', function (): void {
     config()->set('entitlements.type_enum', AdvancedTestType::class);
 
     $isBooleanType = new ReflectionMethod(PlanForm::class, 'isBooleanType');
     $normalizeQuantity = new ReflectionMethod(PlanForm::class, 'normalizeQuantity');
-    $source = (string) file_get_contents((string) (new ReflectionClass(PlanForm::class))->getFileName());
 
     expect($isBooleanType->invoke(null, AdvancedTestType::Boolean->value))->toBeTrue()
         ->and($isBooleanType->invoke(null, AdvancedTestType::Computed->value))->toBeFalse()
         ->and($isBooleanType->invoke(null, AdvancedTestType::Slot->value))->toBeFalse()
         ->and($normalizeQuantity->invoke(null, 8, AdvancedTestType::Boolean->value))->toBe(1)
         ->and($normalizeQuantity->invoke(null, 0, AdvancedTestType::Boolean->value))->toBe(0)
-        ->and($normalizeQuantity->invoke(null, 8, AdvancedTestType::Computed->value))->toBe(8)
-        ->and($source)->toContain('Group::make()')
-        ->and($source)->toContain("Toggle::make('enabled')")
-        ->and($source)->toContain("\$set('quantity', \$state ? 1 : 0)")
-        ->and($source)->toContain("\$set('is_flexible', false)")
-        ->and($source)->toContain('->dehydrated(false)');
+        ->and($normalizeQuantity->invoke(null, 8, AdvancedTestType::Computed->value))->toBe(8);
+});
+
+it('renders boolean plan items as an enabled toggle instead of a quantity input', function (): void {
+    config()->set('entitlements.type_enum', AdvancedTestType::class);
+    Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+    Livewire::test(ListPlans::class)
+        ->mountAction('create')
+        ->fillForm([
+            'name' => 'Boolean plan',
+            'billing_period' => BillingPeriod::Monthly->value,
+            'items' => [
+                'boolean-item' => [
+                    'type' => AdvancedTestType::Boolean->value,
+                    'quantity' => 1,
+                    'is_flexible' => true,
+                ],
+                'computed-item' => [
+                    'type' => AdvancedTestType::Computed->value,
+                    'quantity' => 5,
+                    'is_flexible' => true,
+                ],
+            ],
+        ])
+        ->assertFormFieldVisible('items.boolean-item.enabled')
+        ->assertFormFieldHidden('items.boolean-item.quantity')
+        ->assertFormFieldHidden('items.boolean-item.is_flexible')
+        ->assertFormFieldHidden('items.computed-item.enabled')
+        ->assertFormFieldVisible('items.computed-item.quantity')
+        ->assertFormFieldVisible('items.computed-item.is_flexible')
+        ->fillForm(['items.boolean-item.enabled' => false])
+        ->callMountedAction()
+        ->assertHasNoFormErrors();
+
+    $plan = Plan::query()->where('name->en', 'Boolean plan')->firstOrFail();
+
+    expect($plan->items()->where('type', AdvancedTestType::Boolean->value)->firstOrFail())
+        ->quantity->toBe(0)
+        ->is_flexible->toBeFalse()
+        ->and($plan->items()->where('type', AdvancedTestType::Computed->value)->firstOrFail())
+        ->quantity->toBe(5)
+        ->is_flexible->toBeTrue();
 });

@@ -128,6 +128,10 @@ final class Entitlements
         if ($strategy instanceof ComputedStrategy) {
             $capacity = $this->capacity($subscriber, $type);
 
+            if ($capacity === 0) {
+                return 0;
+            }
+
             return max(0, $capacity - $this->computedUsage($subscriber, $type));
         }
 
@@ -537,9 +541,7 @@ final class Entitlements
 
             /** @var PlanItem $item */
             $item = $newItemsByType->get($type);
-            $capacity = ($item->is_flexible && isset($quantityOverrides[$item->id]))
-                ? (int) $quantityOverrides[$item->id]
-                : $item->quantity;
+            $capacity = $this->effectiveQuantity($item, $quantityOverrides);
 
             if ((int) $used > $capacity) {
                 throw InsufficientCapacityForTransition::forType((string) $type, (int) $used, $capacity);
@@ -564,13 +566,9 @@ final class Entitlements
             ->groupBy(fn (License $l) => $l->type->value)
             ->map(fn ($licenses) => (int) $licenses->sum('slot_total'));
 
-        $newByType = $newPlan->items->mapWithKeys(function (PlanItem $item) use ($quantityOverrides): array {
-            $effective = ($item->is_flexible && isset($quantityOverrides[$item->id]))
-                ? (int) $quantityOverrides[$item->id]
-                : (int) $item->quantity;
-
-            return [$item->type->value => $effective];
-        });
+        $newByType = $newPlan->items->mapWithKeys(fn (PlanItem $item): array => [
+            $item->type->value => $this->effectiveQuantity($item, $quantityOverrides),
+        ]);
 
         if ($currentByType->keys()->sort()->values()->all() !== $newByType->keys()->sort()->values()->all()) {
             return false;
@@ -628,6 +626,20 @@ final class Entitlements
     private function strategyFor(LicenseUsage $usage): EntitlementStrategy
     {
         return $usage->license->type->strategy();
+    }
+
+    /** @param array<int, int> $quantityOverrides */
+    private function effectiveQuantity(PlanItem $item, array $quantityOverrides): int
+    {
+        if ($item->type->strategy() instanceof BooleanStrategy) {
+            return min(1, (int) $item->quantity);
+        }
+
+        if ($item->is_flexible && isset($quantityOverrides[$item->id])) {
+            return (int) $quantityOverrides[$item->id];
+        }
+
+        return (int) $item->quantity;
     }
 
     private function computedUsage(Model $subscriber, EntitlementType $type): int
@@ -691,9 +703,7 @@ final class Entitlements
         ?int $parentId,
         array $quantityOverrides,
     ): License {
-        $slotTotal = ($item->is_flexible && isset($quantityOverrides[$item->id]))
-            ? (int) $quantityOverrides[$item->id]
-            : $item->quantity;
+        $slotTotal = $this->effectiveQuantity($item, $quantityOverrides);
 
         return License::create([
             'subscriber_type' => $subscriber->getMorphClass(),

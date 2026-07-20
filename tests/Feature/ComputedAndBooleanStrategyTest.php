@@ -15,6 +15,7 @@ use LucaLongo\LaravelEntitlements\Http\Resources\LicenseResource;
 use LucaLongo\LaravelEntitlements\Models\License;
 use LucaLongo\LaravelEntitlements\Models\LicenseUsage;
 use LucaLongo\LaravelEntitlements\Models\Plan;
+use LucaLongo\LaravelEntitlements\Models\PlanItem;
 use Workbench\App\Enums\AdvancedTestType;
 use Workbench\App\Models\Subject;
 use Workbench\App\Models\Subscriber;
@@ -166,6 +167,38 @@ it('skips read-only licenses during reconciliation', function (): void {
         ->and($slot->fresh()->last_checked_at)->not->toBeNull();
 
     Event::assertDispatchedTimes(LicenseReconciled::class, 1);
+});
+
+it('skips the computed resolver when a subscriber has no computed capacity', function (): void {
+    expect(Entitlements::available($this->subscriber, AdvancedTestType::Computed))->toBe(0);
+
+    $calls = 0;
+    Entitlements::resolveUsageUsing(AdvancedTestType::Computed, function () use (&$calls): int {
+        $calls++;
+
+        return 3;
+    });
+
+    $snapshot = Entitlements::snapshot($this->subscriber);
+    $computed = collect($snapshot->types)
+        ->firstWhere(fn (EntitlementTypeUsage $usage): bool => $usage->type === AdvancedTestType::Computed);
+
+    expect($calls)->toBe(0)
+        ->and($computed->capacity)->toBe(0)
+        ->and($computed->available)->toBe(0);
+});
+
+it('ignores quantity overrides and clamps quantities for boolean plan items', function (): void {
+    $item = PlanItem::factory()->for($this->plan)->create([
+        'type' => AdvancedTestType::Boolean->value,
+        'quantity' => 5,
+        'is_flexible' => true,
+    ]);
+
+    $licenses = Entitlements::assignPlan($this->subscriber, $this->plan, now(), quantityOverrides: [$item->id => 7]);
+
+    expect($licenses)->toHaveCount(1)
+        ->and($licenses->first()->slot_total)->toBe(1);
 });
 
 it('exposes boolean entitlements through allows without mutable usage semantics', function (): void {

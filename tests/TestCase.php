@@ -6,6 +6,7 @@ namespace LucaLongo\LaravelEntitlements\Tests;
 
 use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
 use BladeUI\Icons\BladeIconsServiceProvider;
+use CodeWithDennis\FilamentLucideIcons\FilamentLucideIconsServiceProvider;
 use Filament\Actions\ActionsServiceProvider;
 use Filament\FilamentServiceProvider;
 use Filament\Forms\FormsServiceProvider;
@@ -21,6 +22,7 @@ use Livewire\LivewireServiceProvider;
 use LucaLongo\LaravelEntitlements\LaravelEntitlementsServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use RyanChandler\BladeCaptureDirective\BladeCaptureDirectiveServiceProvider;
+use Technikermathe\LucideIcons\BladeLucideIconsServiceProvider;
 use Workbench\App\Enums\TestType;
 use Workbench\App\Providers\Filament\AdminPanelProvider;
 
@@ -50,6 +52,8 @@ class TestCase extends Orchestra
             LivewireServiceProvider::class,
             BladeIconsServiceProvider::class,
             BladeHeroiconsServiceProvider::class,
+            BladeLucideIconsServiceProvider::class,
+            FilamentLucideIconsServiceProvider::class,
             BladeCaptureDirectiveServiceProvider::class,
             AdminPanelProvider::class,
         ];
@@ -62,6 +66,7 @@ class TestCase extends Orchestra
 
     public function getEnvironmentSetUp($app)
     {
+        config()->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
         config()->set('database.default', 'testing');
         config()->set('database.connections.testing', [
             'driver' => 'sqlite',

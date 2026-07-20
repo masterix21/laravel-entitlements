@@ -92,6 +92,7 @@ final class PlanForm
                                     ->minValue(fn (Get $get): ?int => self::isBooleanType($get('type')) ? null : 1)
                                     ->required(fn (Get $get): bool => ! self::isBooleanType($get('type')))
                                     ->hidden(fn (Get $get): bool => self::isBooleanType($get('type')))
+                                    ->dehydratedWhenHidden()
                                     ->dehydrateStateUsing(fn (mixed $state, Get $get): int => self::normalizeQuantity($state, $get('type'))),
 
                                 Toggle::make('enabled')
@@ -106,6 +107,7 @@ final class PlanForm
                         Toggle::make('is_flexible')
                             ->label(__('Flexible'))
                             ->hidden(fn (Get $get): bool => self::isBooleanType($get('type')))
+                            ->dehydratedWhenHidden()
                             ->dehydrateStateUsing(fn (bool $state, Get $get): bool => self::isBooleanType($get('type')) ? false : $state),
                     ]),
             ]);

@@ -38,6 +38,7 @@ use LucaLongo\LaravelEntitlements\Facades\Entitlements;
 use LucaLongo\LaravelEntitlements\Models\License;
 use LucaLongo\LaravelEntitlements\Models\Plan;
 use LucaLongo\LaravelEntitlements\Models\PlanItem;
+use LucaLongo\LaravelEntitlements\Strategies\BooleanStrategy;
 use LucaLongo\LaravelEntitlements\Strategies\ReadOnlyStrategy;
 use LucaLongo\LaravelEntitlements\Support\EntitlementTypeLabel;
 
@@ -390,6 +391,7 @@ final class LicensesRelationManager extends RelationManager
 
         return $plan->items
             ->where('is_flexible', true)
+            ->reject(fn (PlanItem $item): bool => $item->type->strategy() instanceof BooleanStrategy)
             ->map(fn (PlanItem $item): TextInput => TextInput::make("flexible_quantities.{$item->id}")
                 ->label(trans(':type quantity', ['type' => self::typeLabel($item->type)]))
                 ->numeric()
@@ -427,6 +429,7 @@ final class LicensesRelationManager extends RelationManager
 
         return $plan->items
             ->where('is_flexible', true)
+            ->reject(fn (PlanItem $item): bool => $item->type->strategy() instanceof BooleanStrategy)
             ->map(fn (PlanItem $item): TextInput => TextInput::make("quantity_overrides.{$item->id}")
                 ->label(trans(':type quantity', ['type' => self::typeLabel($item->type)]))
                 ->numeric()

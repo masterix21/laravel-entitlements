@@ -443,6 +443,20 @@ new SlotStrategy(twoPhase: true)
 - All release methods are equivalent: they set the usage to `Released` and decrement the source license `slot_used` by the usage `amount`.
 - `supportsTwoPhaseRelease()` returns `false`.
 
+### ComputedStrategy
+
+- Read-only: `consume()` and every release method throw `UnsupportedEntitlementOperationException` — usage comes from a resolver you register with `Entitlements::resolveUsageUsing()`.
+- `available()` returns `max(0, capacity - resolver result)`; the resolver is skipped entirely (and `0` is returned) when the subscriber has no valid capacity for the type.
+- The resolver must return a non-negative integer, otherwise `ComputedUsageResolverException` is thrown; calling `available()` without a registered resolver throws too.
+- `supportsTwoPhaseRelease()` returns `false`.
+
+### BooleanStrategy
+
+- Read-only: `consume()` and every release method throw `UnsupportedEntitlementOperationException` — a boolean entitlement is a flag, not a quantity.
+- Check it with `Entitlements::allows()`; calling `can()` on a boolean type throws (and vice versa `allows()` on a quantified type).
+- `slot_total` is always clamped to `0`/`1`: plan quantity overrides are ignored for boolean items and legacy quantities above `1` are normalized on assignment.
+- `supportsTwoPhaseRelease()` returns `false`.
+
 ### Custom strategies
 
 Implement the `EntitlementStrategy` contract:
